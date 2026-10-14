@@ -5,6 +5,50 @@
 
 include!(concat!(env!("OUT_DIR"), "/imped.rs"));
 
+/// Text types mapped to the runtime's string types.
+#[cfg(test)]
+mod strings {
+    use super::game;
+    use core::mem::{offset_of, size_of};
+    use imping_runtime::{CStrBuf, CStrPtr, WStrBuf, WStrPtr, WString};
+
+    unsafe extern "system" fn set_title_like(_: WStrPtr) {}
+
+    unsafe extern "system" fn rename_like(_: *mut game::Named, _: CStrPtr, _: *mut u8) -> CStrPtr {
+        CStrPtr::null()
+    }
+
+    #[test]
+    fn struct_fields_use_the_string_types() {
+        let mut named = game::Named {
+            name: CStrPtr::from(c"Hero"),
+            ..game::Named::default()
+        };
+        named.tag.set("[Guild Of Many]");
+        named.title.set("Sir");
+        // SAFETY: `name` points to a static string.
+        assert_eq!(unsafe { named.name.to_string_lossy() }, "Hero");
+        assert_eq!(named.tag.to_string_lossy(), "[Guild ");
+        assert_eq!(named.title.to_string_lossy(), "Sir");
+
+        let _: CStrBuf<8> = named.tag;
+        let _: WStrBuf<4> = named.title;
+        assert_eq!(size_of::<game::Named>(), 24);
+        assert_eq!(offset_of!(game::Named, title), 16);
+        assert!(game::Entity::default().name.is_null());
+    }
+
+    #[test]
+    fn signatures_use_the_string_pointers() {
+        let _: game::ui::SetTitle::Signature = set_title_like;
+        let _: game::ui::Rename::Signature = rename_like;
+        let _: game::LPCSTR = CStrPtr::null();
+        let title = WString::from("Sir");
+        // SAFETY: The function ignores its argument.
+        unsafe { set_title_like(title.as_ptr()) };
+    }
+}
+
 /// Generated functions and globals. `game.exe` is not loaded in the test
 /// process, so these check everything up to `init`; calling and hooking real
 /// functions through generated code is covered end to end with a fixture game

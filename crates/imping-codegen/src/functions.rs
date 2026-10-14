@@ -171,13 +171,17 @@ fn by_value(table: &TypeTable<'_>, layouts: &Layouts, id: TypeId) -> bool {
     }
 }
 
-/// A parameter or return type, with arrays decayed to pointers.
+/// A parameter or return type, with arrays decayed to pointers (text arrays
+/// to the runtime's string pointers).
 fn value_type(table: &TypeTable<'_>, id: TypeId, depth: usize) -> TokenStream {
     match table.peel(id).map(|def| &def.kind) {
-        Some(TypeKind::Array { element, .. }) => {
-            let element = table.rust_type(*element, depth);
-            quote! { *mut #element }
-        }
+        Some(TypeKind::Array { element, .. }) => match table.text_kind(*element) {
+            Some(text) => text.pointer(),
+            None => {
+                let element = table.rust_type(*element, depth);
+                quote! { *mut #element }
+            }
+        },
         _ => table.rust_type(id, depth),
     }
 }

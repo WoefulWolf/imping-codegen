@@ -114,7 +114,7 @@ pub mod game {
         /// Unknown bytes `0x20..0x28`.
         pub _pad_0x20: [u8; 8],
         /// `name` at `0x28`.
-        pub name: *const i8,
+        pub name: ::imping_runtime::CStrPtr,
         /// `target` at `0x30`.
         pub target: *mut Entity,
         /// `on_hit` at `0x38`.
@@ -557,8 +557,9 @@ pub mod game {
     };
 
     /// Typedef `LogFn`.
-    pub type LogFn = ::core::option::Option<unsafe extern "C" fn(*const i8, ...) -> i32>;
-
+    pub type LogFn = ::core::option::Option<
+        unsafe extern "C" fn(::imping_runtime::CStrPtr, ...) -> i32,
+    >;
     /// `Wide`: 24 bytes, align 8.
     #[repr(C)]
     #[derive(Clone, Copy, Debug)]
@@ -629,6 +630,40 @@ pub mod game {
         _private: [u8; 0],
         _marker: ::core::marker::PhantomData<(*mut u8, ::core::marker::PhantomPinned)>,
     }
+
+    /// `Named`: 24 bytes, align 8.
+    #[repr(C)]
+    #[derive(Clone, Copy, Debug)]
+    pub struct Named {
+        /// `name` at `0x0`.
+        pub name: ::imping_runtime::CStrPtr,
+        /// `tag` at `0x8`.
+        pub tag: ::imping_runtime::CStrBuf<8>,
+        /// `title` at `0x10`.
+        pub title: ::imping_runtime::WStrBuf<4>,
+    }
+
+    impl ::core::default::Default for Named {
+        /// All fields zero.
+        fn default() -> Self {
+            // SAFETY: every field type is valid when all-zero.
+            unsafe { ::core::mem::zeroed() }
+        }
+    }
+
+    const _: () = {
+        ::core::assert!(::core::mem::size_of::<Named>() == 0x18);
+        ::core::assert!(::core::mem::align_of::<Named>() == 0x8);
+        ::core::assert!(::core::mem::offset_of!(Named, name) == 0x0);
+        ::core::assert!(::core::mem::offset_of!(Named, tag) == 0x8);
+        ::core::assert!(::core::mem::offset_of!(Named, title) == 0x10);
+    };
+
+    /// Typedef `CHAR`.
+    pub type CHAR = i8;
+
+    /// Typedef `LPCSTR`.
+    pub type LPCSTR = ::imping_runtime::CStrPtr;
 
     /// `GetPlayer` at `game.exe+0x15200`.
     ///
@@ -1106,8 +1141,10 @@ pub mod game {
             /// The function's address relative to `game.exe`'s base.
             pub const RVA: u32 = 0x15a00;
             /// The function's type.
-            pub type Signature = unsafe extern "C" fn(fmt: *const i8, ...) -> i32;
-
+            pub type Signature = unsafe extern "C" fn(
+                fmt: ::imping_runtime::CStrPtr,
+                ...
+            ) -> i32;
             /// The function's address in this process.
             ///
             /// # Panics
@@ -1292,6 +1329,173 @@ pub mod game {
                             thunk,
                         )
                     }
+                }
+            }
+        }
+    }
+
+    /// Functions and globals in the `ui` namespace.
+    pub mod ui {
+        /// `ui::SetTitle` at `game.exe+0x16200`.
+        ///
+        /// # Safety
+        ///
+        /// Calls into `game.exe`: its `init()` must have succeeded, and the arguments must be valid for this function.
+        ///
+        /// # Panics
+        ///
+        /// If `game.exe`'s `init()` has not succeeded.
+        pub unsafe fn SetTitle(title: ::imping_runtime::WStrPtr) {
+            // SAFETY: forwarded to the caller.
+            unsafe { SetTitle::ptr()(title) }
+        }
+
+        /// Address, signature and hook of `ui::SetTitle`.
+        pub mod SetTitle {
+            /// The function's address relative to `game.exe`'s base.
+            pub const RVA: u32 = 0x16200;
+            /// The function's type.
+            pub type Signature = unsafe extern "system" fn(
+                title: ::imping_runtime::WStrPtr,
+            );
+
+            /// The function's address in this process.
+            ///
+            /// # Panics
+            ///
+            /// If `game.exe`'s `init()` has not succeeded.
+            pub fn ptr() -> Signature {
+                // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
+                unsafe {
+                    ::core::mem::transmute::<
+                        usize,
+                        Signature,
+                    >(super::super::MODULE.address(RVA))
+                }
+            }
+
+            static SLOT: ::imping_runtime::__private::Slot<
+                dyn Fn(Signature, ::imping_runtime::WStrPtr) + Send + Sync,
+                Signature,
+            > = ::imping_runtime::__private::Slot::new();
+            unsafe extern "system" fn thunk(title: ::imping_runtime::WStrPtr) {
+                let (detour, original) = SLOT.get();
+                detour(original, title)
+            }
+
+            /// Hooks `ui::SetTitle`: once enabled, every call runs `detour`, which receives the original function first, then the arguments.
+            ///
+            /// The hook is returned disabled; enable it with `Hook::enable`. Dropping the guard disables it, after which the function can be hooked again. A panic inside `detour` aborts the process.
+            ///
+            /// # Errors
+            ///
+            /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, or if patching fails.
+            pub fn hook(
+                detour: impl Fn(
+                    Signature,
+                    ::imping_runtime::WStrPtr,
+                ) + Send + Sync + 'static,
+            ) -> ::imping_runtime::Result<::imping_runtime::Hook<Signature>> {
+                // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
+                unsafe {
+                    ::imping_runtime::__private::install(
+                        &super::super::MODULE,
+                        RVA,
+                        &[],
+                        &SLOT,
+                        ::std::boxed::Box::new(detour),
+                        thunk,
+                    )
+                }
+            }
+        }
+
+        /// `ui::Rename` at `game.exe+0x16300`.
+        ///
+        /// # Safety
+        ///
+        /// Calls into `game.exe`: its `init()` must have succeeded, and the arguments must be valid for this function.
+        ///
+        /// # Panics
+        ///
+        /// If `game.exe`'s `init()` has not succeeded.
+        pub unsafe fn Rename(
+            named: *mut super::Named,
+            tag: ::imping_runtime::CStrPtr,
+            data: *mut u8,
+        ) -> super::LPCSTR {
+            // SAFETY: forwarded to the caller.
+            unsafe { Rename::ptr()(named, tag, data) }
+        }
+
+        /// Address, signature and hook of `ui::Rename`.
+        pub mod Rename {
+            /// The function's address relative to `game.exe`'s base.
+            pub const RVA: u32 = 0x16300;
+            /// The function's type.
+            pub type Signature = unsafe extern "system" fn(
+                named: *mut super::super::Named,
+                tag: ::imping_runtime::CStrPtr,
+                data: *mut u8,
+            ) -> super::super::LPCSTR;
+            /// The function's address in this process.
+            ///
+            /// # Panics
+            ///
+            /// If `game.exe`'s `init()` has not succeeded.
+            pub fn ptr() -> Signature {
+                // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
+                unsafe {
+                    ::core::mem::transmute::<
+                        usize,
+                        Signature,
+                    >(super::super::MODULE.address(RVA))
+                }
+            }
+
+            static SLOT: ::imping_runtime::__private::Slot<
+                dyn Fn(
+                    Signature,
+                    *mut super::super::Named,
+                    ::imping_runtime::CStrPtr,
+                    *mut u8,
+                ) -> super::super::LPCSTR + Send + Sync,
+                Signature,
+            > = ::imping_runtime::__private::Slot::new();
+            unsafe extern "system" fn thunk(
+                named: *mut super::super::Named,
+                tag: ::imping_runtime::CStrPtr,
+                data: *mut u8,
+            ) -> super::super::LPCSTR {
+                let (detour, original) = SLOT.get();
+                detour(original, named, tag, data)
+            }
+
+            /// Hooks `ui::Rename`: once enabled, every call runs `detour`, which receives the original function first, then the arguments.
+            ///
+            /// The hook is returned disabled; enable it with `Hook::enable`. Dropping the guard disables it, after which the function can be hooked again. A panic inside `detour` aborts the process.
+            ///
+            /// # Errors
+            ///
+            /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, or if patching fails.
+            pub fn hook(
+                detour: impl Fn(
+                    Signature,
+                    *mut super::super::Named,
+                    ::imping_runtime::CStrPtr,
+                    *mut u8,
+                ) -> super::super::LPCSTR + Send + Sync + 'static,
+            ) -> ::imping_runtime::Result<::imping_runtime::Hook<Signature>> {
+                // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
+                unsafe {
+                    ::imping_runtime::__private::install(
+                        &super::super::MODULE,
+                        RVA,
+                        &[],
+                        &SLOT,
+                        ::std::boxed::Box::new(detour),
+                        thunk,
+                    )
                 }
             }
         }

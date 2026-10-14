@@ -129,6 +129,9 @@ impl<'a> TypeTable<'a> {
                 {
                     return self.function_pointer(peeled, depth);
                 }
+                if let Some(text) = self.text_kind(*pointee) {
+                    return text.pointer();
+                }
                 let pointee = self.rust_type(*pointee, depth);
                 if *is_const {
                     quote! { *const #pointee }
@@ -137,8 +140,11 @@ impl<'a> TypeTable<'a> {
                 }
             }
             TypeKind::Array { element, count } => {
-                let element = self.rust_type(*element, depth);
                 let count = proc_macro2::Literal::u64_unsuffixed(*count);
+                if let Some(text) = self.text_kind(*element) {
+                    return text.buffer(count);
+                }
+                let element = self.rust_type(*element, depth);
                 quote! { [#element; #count] }
             }
             // A function type used as a value decays to a pointer, as in C.
@@ -149,6 +155,28 @@ impl<'a> TypeTable<'a> {
             | TypeKind::Enum { .. }
             | TypeKind::Opaque { .. }
             | TypeKind::Typedef { .. } => self.path(id, depth),
+        }
+    }
+
+    /// Whether a type is a text character: through typedefs, a primitive named
+    /// `char` (one byte) or `wchar_t` / `wchar16` (two bytes). Pointers to and
+    /// arrays of them become the runtime's string types.
+    pub(crate) fn text_kind(&self, id: TypeId) -> Option<Text> {
+        let def = self.peel(id)?;
+        match (def.name.as_str(), &def.kind) {
+            (
+                "char",
+                TypeKind::Primitive {
+                    primitive: Primitive::I8 | Primitive::U8,
+                },
+            ) => Some(Text::Narrow),
+            (
+                "wchar_t" | "wchar16",
+                TypeKind::Primitive {
+                    primitive: Primitive::U16 | Primitive::I16,
+                },
+            ) => Some(Text::Wide),
+            _ => None,
         }
     }
 
@@ -239,6 +267,33 @@ fn primitive_type(primitive: Primitive) -> TokenStream {
         Primitive::I64 => quote! { i64 },
         Primitive::F32 => quote! { f32 },
         Primitive::F64 => quote! { f64 },
+    }
+}
+
+/// The character width of a text type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Text {
+    /// `char`: narrow, NUL-terminated text.
+    Narrow,
+    /// `wchar_t`: UTF-16, NUL-terminated text.
+    Wide,
+}
+
+impl Text {
+    /// The runtime type for a pointer to this text.
+    pub(crate) fn pointer(self) -> TokenStream {
+        match self {
+            Text::Narrow => quote! { ::imping_runtime::CStrPtr },
+            Text::Wide => quote! { ::imping_runtime::WStrPtr },
+        }
+    }
+
+    /// The runtime type for a fixed-size buffer of `count` characters.
+    pub(crate) fn buffer(self, count: proc_macro2::Literal) -> TokenStream {
+        match self {
+            Text::Narrow => quote! { ::imping_runtime::CStrBuf<#count> },
+            Text::Wide => quote! { ::imping_runtime::WStrBuf<#count> },
+        }
     }
 }
 

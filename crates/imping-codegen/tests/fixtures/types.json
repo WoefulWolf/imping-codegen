@@ -135,7 +135,22 @@
         { "id": 47, "name": "LoopA", "kind": "typedef", "target": 48 },
         { "id": 48, "name": "LoopB", "kind": "typedef", "target": 47 },
         { "id": 49, "name": "uint32_t", "kind": "typedef", "target": 50 },
-        { "id": 50, "name": "uint32_t", "kind": "primitive", "primitive": "u32" }
+        { "id": 50, "name": "uint32_t", "kind": "primitive", "primitive": "u32" },
+        { "id": 51, "name": "wchar_t", "kind": "primitive", "primitive": "u16" },
+        { "id": 52, "name": "wchar_t *", "kind": "pointer", "pointee": 51 },
+        { "id": 53, "name": "char[8]", "kind": "array", "element": 3, "count": 8 },
+        { "id": 54, "name": "wchar_t[4]", "kind": "array", "element": 51, "count": 4 },
+        { "id": 55, "name": "Named", "kind": "struct", "size": 24, "align": 8,
+          "fields": [
+            { "name": "name", "type": 15, "offset": 0 },
+            { "name": "tag", "type": 53, "offset": 8 },
+            { "name": "title", "type": 54, "offset": 16 }
+          ] },
+        { "id": 56, "name": "unsigned char *", "kind": "pointer", "pointee": 2 },
+        { "id": 57, "name": "Named *", "kind": "pointer", "pointee": 55 },
+        { "id": 58, "name": "CHAR", "kind": "typedef", "target": 3 },
+        { "id": 59, "name": "LPCSTR", "kind": "typedef", "target": 60 },
+        { "id": 60, "name": "CHAR const *", "kind": "pointer", "pointee": 58, "const": true }
       ],
       "functions": [
         { "name": "GetPlayer", "rva": "0x15200", "calling_convention": "win64",
@@ -194,6 +209,18 @@
         { "name": "Tick", "namespace": ["Game", "World"], "rva": "0x16000",
           "calling_convention": "win64", "return_type": 0,
           "parameters": [ { "type": 0, "storage": { "kind": "stack", "offset": 0 } } ] },
+        { "name": "SetTitle", "namespace": ["ui"], "rva": "0x16200",
+          "calling_convention": "win64", "return_type": 0,
+          "parameters": [
+            { "name": "title", "type": 52, "storage": { "kind": "register", "value": "rcx" } }
+          ] },
+        { "name": "Rename", "namespace": ["ui"], "rva": "0x16300",
+          "calling_convention": "win64", "return_type": 59,
+          "parameters": [
+            { "name": "named", "type": 57, "storage": { "kind": "register", "value": "rcx" } },
+            { "name": "tag", "type": 53, "storage": { "kind": "register", "value": "rdx" } },
+            { "name": "data", "type": 56, "storage": { "kind": "register", "value": "r8" } }
+          ] },
         { "name": "Normalize", "namespace": ["math"], "rva": "0x16100",
           "calling_convention": "win64", "return_type": 10,
           "parameters": [
