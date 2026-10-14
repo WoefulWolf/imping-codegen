@@ -1,0 +1,23 @@
+[package]
+name = "imping-codegen"
+description = "Rust code generation from IR for the imping modding suite."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+imping-ir.workspace = true
+# Code generation and formatting.
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "3", default-features = false, features = ["full", "parsing", "printing"] }
+# `verbatim` formats the arguments of standard macros such as `assert!`.
+prettyplease = { version = "0.3", features = ["verbatim"] }
+
+[dev-dependencies]
+insta = "1"
+
+[lints]
+workspace = true

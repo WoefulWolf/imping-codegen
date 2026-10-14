@@ -1,0 +1,40 @@
+{
+  "format_version": { "major": 1, "minor": 0 },
+  "modules": [
+    {
+      "name": "Game32.exe",
+      "architecture": "x86",
+      "image_base": "0x400000",
+      "timestamp": "0x5f1e2d3c",
+      "image_size": "0x2a0000",
+      "types": [
+        { "id": 0, "name": "void", "kind": "primitive", "primitive": "void" },
+        { "id": 1, "name": "unsigned int", "kind": "primitive", "primitive": "u32" },
+        { "id": 2, "name": "unsigned long long", "kind": "primitive", "primitive": "u64" },
+        { "id": 3, "name": "float", "kind": "primitive", "primitive": "f32" },
+        { "id": 4, "name": "Node", "kind": "struct", "size": 16, "align": 8,
+          "fields": [
+            { "name": "next", "type": 5, "offset": 0 },
+            { "name": "value", "type": 2, "offset": 8 }
+          ] },
+        { "id": 5, "name": "Node *", "kind": "pointer", "pointee": 4 },
+        { "id": 6, "name": "unsigned int (Node *, float)", "kind": "function",
+          "calling_convention": "thiscall", "parameters": [5, 3], "return_type": 1 },
+        { "id": 7, "name": "unsigned int (*)(Node *, float)", "kind": "pointer", "pointee": 6 },
+        { "id": 8, "name": "VisitFn", "kind": "typedef", "target": 7 },
+        { "id": 9, "name": "void (unsigned int)", "kind": "function",
+          "calling_convention": "stdcall", "parameters": [1], "return_type": 0 },
+        { "id": 10, "name": "void (*)(unsigned int)", "kind": "pointer", "pointee": 9 },
+        { "id": 11, "name": "StdcallFn", "kind": "typedef", "target": 10 },
+        { "id": 12, "name": "unsigned int (unsigned int, unsigned int)", "kind": "function",
+          "calling_convention": "fastcall", "parameters": [1, 1], "return_type": 1 },
+        { "id": 13, "name": "unsigned int (*)(unsigned int, unsigned int)", "kind": "pointer", "pointee": 12 },
+        { "id": 14, "name": "FastcallFn", "kind": "typedef", "target": 13 },
+        { "id": 15, "name": "unsigned int (unsigned int)", "kind": "function",
+          "calling_convention": "cdecl", "parameters": [1], "return_type": 1 },
+        { "id": 16, "name": "unsigned int (*)(unsigned int)", "kind": "pointer", "pointee": 15 },
+        { "id": 17, "name": "CdeclFn", "kind": "typedef", "target": 16 }
+      ]
+    }
+  ]
+}

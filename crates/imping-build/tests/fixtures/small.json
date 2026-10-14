@@ -1,0 +1,35 @@
+{
+  "format_version": { "major": 1, "minor": 0 },
+  "modules": [
+    {
+      "name": "game.exe",
+      "architecture": "x64",
+      "image_base": "0x140000000",
+      "timestamp": "0x64b8f2a1",
+      "image_size": "0xa2b000",
+      "types": [
+        { "id": 0, "name": "void", "kind": "primitive", "primitive": "void" },
+        { "id": 1, "name": "float", "kind": "primitive", "primitive": "f32" },
+        { "id": 2, "name": "Vector2", "kind": "struct", "size": 8, "align": 4,
+          "fields": [
+            { "name": "x", "type": 1, "offset": 0 },
+            { "name": "y", "type": 1, "offset": 4 }
+          ] },
+        { "id": 3, "name": "Vector2 *", "kind": "pointer", "pointee": 2 }
+      ],
+      "functions": [
+        { "name": "Normalize", "namespace": ["math"], "rva": "0x14230",
+          "calling_convention": "win64", "return_type": 0,
+          "parameters": [
+            { "name": "v", "type": 3, "storage": { "kind": "register", "value": "rcx" } }
+          ] }
+      ],
+      "globals": [
+        { "name": "gGravity", "rva": "0x3a1200", "type": 1 }
+      ],
+      "vtables": [
+        { "name": "Entity", "rva": "0x3b0040", "entries": [] }
+      ]
+    }
+  ]
+}

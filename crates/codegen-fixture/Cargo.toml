@@ -1,0 +1,18 @@
+[package]
+name = "codegen-fixture"
+description = "Test-only crate: compiles the bindings generated from imping-codegen's fixture IR and checks them at run time."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+imping-runtime.workspace = true
+
+[build-dependencies]
+imping-ir.workspace = true
+imping-codegen.workspace = true
+
+[lints]
+workspace = true

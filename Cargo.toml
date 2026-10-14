@@ -1,0 +1,25 @@
+[workspace]
+resolver = "3"
+members = ["crates/imping-codegen", "crates/imping-build", "crates/codegen-fixture"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+# Sibling suite repos, by relative path during development.
+imping-ir = { path = "../imping-ir" }
+# Only the test-only codegen-fixture crate uses it: generated code needs it.
+imping-runtime = { path = "../imping-runtime" }
+imping-codegen = { path = "crates/imping-codegen" }
+
+[workspace.lints.rust]
+missing_docs = "warn"
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "warn"
+missing_safety_doc = "warn"

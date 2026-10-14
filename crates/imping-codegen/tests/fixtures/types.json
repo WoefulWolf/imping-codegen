@@ -1,0 +1,214 @@
+{
+  "format_version": { "major": 1, "minor": 0 },
+  "modules": [
+    {
+      "name": "game.exe",
+      "architecture": "x64",
+      "image_base": "0x140000000",
+      "timestamp": "0x64b8f2a1",
+      "image_size": "0xa2b000",
+      "types": [
+        { "id": 0, "name": "void", "kind": "primitive", "primitive": "void" },
+        { "id": 1, "name": "bool", "kind": "primitive", "primitive": "bool" },
+        { "id": 2, "name": "unsigned char", "kind": "primitive", "primitive": "u8" },
+        { "id": 3, "name": "char", "kind": "primitive", "primitive": "i8" },
+        { "id": 4, "name": "unsigned short", "kind": "primitive", "primitive": "u16" },
+        { "id": 5, "name": "int", "kind": "primitive", "primitive": "i32" },
+        { "id": 6, "name": "unsigned int", "kind": "primitive", "primitive": "u32" },
+        { "id": 7, "name": "unsigned long long", "kind": "primitive", "primitive": "u64" },
+        { "id": 8, "name": "float", "kind": "primitive", "primitive": "f32" },
+        { "id": 9, "name": "double", "kind": "primitive", "primitive": "f64" },
+        { "id": 10, "name": "Vector3", "kind": "struct", "size": 12, "align": 4,
+          "fields": [
+            { "name": "x", "type": 8, "offset": 0 },
+            { "name": "y", "type": 8, "offset": 4 },
+            { "name": "z", "type": 8, "offset": 8 }
+          ] },
+        { "id": 11, "name": "EntityKind", "kind": "enum", "underlying": 6,
+          "variants": [
+            { "name": "None", "value": 0 },
+            { "name": "Player", "value": 1 },
+            { "name": "Npc", "value": 2 },
+            { "name": "Default", "value": 0 },
+            { "name": "Invalid", "value": -1 }
+          ] },
+        { "id": 12, "name": "Entity", "kind": "struct", "size": 64, "align": 8,
+          "fields": [
+            { "name": "vtable", "type": 13, "offset": 0 },
+            { "name": "kind", "type": 11, "offset": 8 },
+            { "name": "visible", "type": 1, "offset": 12, "bits": { "bit_offset": 0, "bit_width": 1 } },
+            { "name": "team", "type": 6, "offset": 12, "bits": { "bit_offset": 1, "bit_width": 3 } },
+            { "name": "level", "type": 5, "offset": 12, "bits": { "bit_offset": 4, "bit_width": 5 } },
+            { "name": "state", "type": 11, "offset": 12, "bits": { "bit_offset": 9, "bit_width": 2 } },
+            { "name": "position", "type": 10, "offset": 16 },
+            { "name": "health", "type": 8, "offset": 28 },
+            { "name": "name", "type": 15, "offset": 40 },
+            { "name": "target", "type": 16, "offset": 48 },
+            { "name": "on_hit", "type": 17, "offset": 56 }
+          ] },
+        { "id": 13, "name": "void * *", "kind": "pointer", "pointee": 14 },
+        { "id": 14, "name": "void *", "kind": "pointer", "pointee": 0 },
+        { "id": 15, "name": "char const *", "kind": "pointer", "pointee": 3, "const": true },
+        { "id": 16, "name": "Entity *", "kind": "pointer", "pointee": 12 },
+        { "id": 17, "name": "void (*)(Entity *, float)", "kind": "pointer", "pointee": 18 },
+        { "id": 18, "name": "void (Entity *, float)", "kind": "function",
+          "calling_convention": "win64", "parameters": [16, 8], "return_type": 0 },
+        { "id": 19, "name": "PackedHeader", "kind": "struct", "size": 7, "align": 1,
+          "fields": [
+            { "name": "magic", "type": 2, "offset": 0 },
+            { "name": "length", "type": 6, "offset": 1 },
+            { "name": "flags", "type": 4, "offset": 5 }
+          ] },
+        { "id": 20, "name": "Aligned16", "kind": "struct", "size": 16, "align": 16,
+          "fields": [ { "name": "value", "type": 8, "offset": 0 } ] },
+        { "id": 21, "name": "Value", "kind": "union", "size": 8, "align": 8,
+          "fields": [
+            { "name": "i", "type": 5, "offset": 0 },
+            { "name": "f", "type": 8, "offset": 0 },
+            { "name": "p", "type": 14, "offset": 0 }
+          ] },
+        { "id": 22, "name": "Small", "kind": "union", "size": 4, "align": 4,
+          "fields": [ { "name": "b", "type": 2, "offset": 0 } ] },
+        { "id": 23, "name": "SmallSigned", "kind": "enum", "underlying": 3,
+          "variants": [
+            { "name": "Neg", "value": -1 },
+            { "name": "Pos", "value": 1 },
+            { "name": "Big", "value": 200 },
+            { "name": "Huge", "value": 1000 }
+          ] },
+        { "id": 24, "name": "DWORD", "kind": "typedef", "target": 6 },
+        { "id": 25, "name": "Vector3", "kind": "typedef", "target": 10 },
+        { "id": 26, "name": "Callback", "kind": "typedef", "target": 17 },
+        { "id": 27, "name": "Renderer", "kind": "opaque" },
+        { "id": 28, "name": "Blob", "kind": "opaque", "size": 16 },
+        { "id": 29, "name": "Broken", "kind": "struct", "size": 8, "align": 4,
+          "fields": [
+            { "name": "a", "type": 6, "offset": 0 },
+            { "name": "b", "type": 6, "offset": 2 }
+          ] },
+        { "id": 30, "name": "Vector3", "kind": "struct", "size": 8, "align": 4,
+          "fields": [
+            { "name": "x", "type": 8, "offset": 0 },
+            { "name": "y", "type": 8, "offset": 4 }
+          ] },
+        { "id": 31, "name": "Keywords", "kind": "struct", "size": 12, "align": 4,
+          "fields": [
+            { "name": "type", "type": 6, "offset": 0 },
+            { "name": "self", "type": 6, "offset": 4 },
+            { "name": "operator==", "type": 2, "offset": 8 },
+            { "name": "8bit", "type": 2, "offset": 9 }
+          ] },
+        { "id": 32, "name": "Holder", "kind": "struct", "size": 24, "align": 8,
+          "fields": [
+            { "name": "renderer", "type": 33, "offset": 0 },
+            { "name": "blob", "type": 28, "offset": 8 }
+          ] },
+        { "id": 33, "name": "Renderer *", "kind": "pointer", "pointee": 27 },
+        { "id": 34, "name": "float[4]", "kind": "array", "element": 8, "count": 4 },
+        { "id": 35, "name": "Matrix", "kind": "struct", "size": 64, "align": 4,
+          "fields": [ { "name": "rows", "type": 36, "offset": 0 } ] },
+        { "id": 36, "name": "float[4][4]", "kind": "array", "element": 34, "count": 4 },
+        { "id": 37, "name": "UsesBroken", "kind": "struct", "size": 16, "align": 4,
+          "fields": [
+            { "name": "inner", "type": 29, "offset": 0 },
+            { "name": "tail", "type": 6, "offset": 8 }
+          ] },
+        { "id": 38, "name": "Unsized", "kind": "struct", "size": 8, "align": 8,
+          "fields": [ { "name": "r", "type": 27, "offset": 0 } ] },
+        { "id": 39, "name": "init", "kind": "struct", "size": 4, "align": 4,
+          "fields": [ { "name": "v", "type": 6, "offset": 0 } ] },
+        { "id": 40, "name": "int (char const *, ...)", "kind": "function",
+          "calling_convention": "win64", "parameters": [15], "return_type": 5, "variadic": true },
+        { "id": 41, "name": "LogFn", "kind": "typedef", "target": 42 },
+        { "id": 42, "name": "int (*)(char const *, ...)", "kind": "pointer", "pointee": 40 },
+        { "id": 43, "name": "Wide", "kind": "struct", "size": 24, "align": 8,
+          "fields": [
+            { "name": "big", "type": 7, "offset": 0 },
+            { "name": "lo", "type": 7, "offset": 8, "bits": { "bit_offset": 0, "bit_width": 40 } },
+            { "name": "hi", "type": 5, "offset": 8, "bits": { "bit_offset": 40, "bit_width": 20 } },
+            { "name": "count", "type": 49, "offset": 16 }
+          ] },
+        { "id": 44, "name": "void (void)", "kind": "function",
+          "calling_convention": "win64", "parameters": [0], "return_type": 0 },
+        { "id": 45, "name": "void (*)(void)", "kind": "pointer", "pointee": 44 },
+        { "id": 46, "name": "TickFn", "kind": "typedef", "target": 45 },
+        { "id": 47, "name": "LoopA", "kind": "typedef", "target": 48 },
+        { "id": 48, "name": "LoopB", "kind": "typedef", "target": 47 },
+        { "id": 49, "name": "uint32_t", "kind": "typedef", "target": 50 },
+        { "id": 50, "name": "uint32_t", "kind": "primitive", "primitive": "u32" }
+      ],
+      "functions": [
+        { "name": "GetPlayer", "rva": "0x15200", "calling_convention": "win64",
+          "return_type": 16, "parameters": [] },
+        { "name": "Update", "namespace": ["Entity"], "rva": "0x15040",
+          "calling_convention": "win64", "return_type": 0,
+          "parameters": [
+            { "name": "this", "type": 16, "storage": { "kind": "register", "value": "rcx" } },
+            { "name": "dt", "type": 8, "storage": { "kind": "register", "value": "xmm1" } }
+          ],
+          "tags": ["hot", "ai"], "verification": "4883ec28" },
+        { "name": "Damage", "namespace": ["Entity"], "rva": "0x15400",
+          "calling_convention": "win64", "return_type": 0,
+          "parameters": [
+            { "name": "this", "type": 16, "storage": { "kind": "register", "value": "rcx" } },
+            { "name": "amount", "type": 8, "storage": { "kind": "register", "value": "xmm1" } }
+          ] },
+        { "name": "Damage", "namespace": ["Entity"], "rva": "0x15300",
+          "calling_convention": "win64", "return_type": 0,
+          "parameters": [
+            { "name": "this", "type": 16, "storage": { "kind": "register", "value": "rcx" } },
+            { "name": "amount", "type": 5, "storage": { "kind": "register", "value": "edx" } }
+          ] },
+        { "name": "Entity", "namespace": ["Entity"], "rva": "0x15000",
+          "calling_convention": "win64", "return_type": 16,
+          "parameters": [
+            { "name": "this", "type": 16, "storage": { "kind": "register", "value": "rcx" } }
+          ] },
+        { "name": "Log", "namespace": ["util"], "rva": "0x15a00",
+          "calling_convention": "win64", "return_type": 5,
+          "parameters": [
+            { "name": "fmt", "type": 15, "storage": { "kind": "register", "value": "rcx" } }
+          ],
+          "variadic": true },
+        { "name": "FastPath", "namespace": ["util"], "rva": "0x15b00",
+          "calling_convention": "win64", "return_type": 6,
+          "parameters": [
+            { "name": "x", "type": 6, "storage": { "kind": "register", "value": "eax" } }
+          ],
+          "custom_storage": true },
+        { "name": "TakesRenderer", "namespace": ["util"], "rva": "0x15c00",
+          "calling_convention": "win64", "return_type": 0,
+          "parameters": [
+            { "name": "r", "type": 27, "storage": { "kind": "register", "value": "rcx" } }
+          ] },
+        { "name": "init", "rva": "0x15d00", "calling_convention": "win64",
+          "return_type": 0, "parameters": [] },
+        { "name": "Mixed", "namespace": ["util"], "rva": "0x15e00",
+          "calling_convention": "win64", "return_type": 7,
+          "parameters": [
+            { "type": 6, "storage": { "kind": "register", "value": "rcx" } },
+            { "name": "original", "type": 6, "storage": { "kind": "register", "value": "rdx" } },
+            { "name": "detour", "type": 1, "storage": { "kind": "register", "value": "r8" } },
+            { "name": "type", "type": 34, "storage": { "kind": "register", "value": "r9" } }
+          ] },
+        { "name": "Tick", "namespace": ["Game", "World"], "rva": "0x16000",
+          "calling_convention": "win64", "return_type": 0,
+          "parameters": [ { "type": 0, "storage": { "kind": "stack", "offset": 0 } } ] },
+        { "name": "Normalize", "namespace": ["math"], "rva": "0x16100",
+          "calling_convention": "win64", "return_type": 10,
+          "parameters": [
+            { "name": "v", "type": 10, "storage": { "kind": "register", "value": "rcx" } }
+          ] }
+      ],
+      "globals": [
+        { "name": "gGravity", "rva": "0x3a1200", "type": 8 },
+        { "name": "sCount", "namespace": ["Entity"], "rva": "0x3a1300", "type": 6 },
+        { "name": "gPlayer", "rva": "0x3a1400", "type": 16 }
+      ],
+      "vtables": [
+        { "name": "Entity", "namespace": ["game"], "rva": "0x3b0040",
+          "entries": [ { "index": 0, "name": "Destructor", "rva": "0x15000" } ] }
+      ]
+    }
+  ]
+}

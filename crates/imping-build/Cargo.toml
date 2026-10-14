@@ -1,0 +1,29 @@
+[package]
+name = "imping-build"
+description = "Build-script helper and command-line tool that generate Rust bindings for the imping modding suite."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+imping-ir.workspace = true
+imping-codegen.workspace = true
+# The `imping` command line, only with the `cli` feature, so build scripts
+# never compile it.
+clap = { version = "4", features = ["derive"], optional = true }
+
+[features]
+default = []
+# Builds the `imping` command-line tool:
+# `cargo install --path crates/imping-build --features cli`.
+cli = ["dep:clap"]
+
+[[bin]]
+name = "imping"
+path = "src/bin/imping.rs"
+required-features = ["cli"]
+
+[lints]
+workspace = true
