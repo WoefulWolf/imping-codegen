@@ -1,5 +1,5 @@
 {
-  "format_version": { "major": 1, "minor": 0 },
+  "format_version": { "major": 1, "minor": 1 },
   "modules": [
     {
       "name": "game.exe",
@@ -150,7 +150,34 @@
         { "id": 57, "name": "Named *", "kind": "pointer", "pointee": 55 },
         { "id": 58, "name": "CHAR", "kind": "typedef", "target": 3 },
         { "id": 59, "name": "LPCSTR", "kind": "typedef", "target": 60 },
-        { "id": 60, "name": "CHAR const *", "kind": "pointer", "pointee": 58, "const": true }
+        { "id": 60, "name": "CHAR const *", "kind": "pointer", "pointee": 58, "const": true },
+        { "id": 61, "name": "Actor", "namespace": ["actors"], "kind": "struct", "size": 72, "align": 8,
+          "fields": [
+            { "name": "base", "type": 12, "offset": 0, "base": true },
+            { "name": "speed", "type": 8, "offset": 64 },
+            { "name": "flags", "type": 6, "offset": 68 }
+          ] },
+        { "id": 62, "name": "Player", "namespace": ["actors"], "kind": "struct", "size": 80, "align": 8,
+          "fields": [
+            { "name": "base", "type": 61, "offset": 0, "base": true },
+            { "name": "score", "type": 5, "offset": 72 },
+            { "name": "rank", "type": 66, "offset": 76 }
+          ] },
+        { "id": 63, "name": "Player *", "kind": "pointer", "pointee": 62, "const": false },
+        { "id": 64, "name": "Item", "namespace": ["actors"], "kind": "struct", "size": 16, "align": 4,
+          "fields": [
+            { "name": "count", "type": 5, "offset": 0 },
+            { "name": "base", "type": 10, "offset": 4, "base": true }
+          ] },
+        { "id": 65, "name": "PackedBase", "kind": "struct", "size": 17, "align": 1,
+          "fields": [
+            { "name": "base", "type": 10, "offset": 0, "base": true },
+            { "name": "tag", "type": 2, "offset": 12 },
+            { "name": "count", "type": 6, "offset": 13 }
+          ] },
+        { "id": 66, "name": "Rank", "namespace": ["actors"], "kind": "enum", "underlying": 6,
+          "variants": [ { "name": "Bronze", "value": 0 }, { "name": "Gold", "value": 2 } ] },
+        { "id": 67, "name": "Actor *", "kind": "pointer", "pointee": 61, "const": false }
       ],
       "functions": [
         { "name": "GetPlayer", "rva": "0x15200", "calling_convention": "win64",
@@ -242,12 +269,28 @@
           "parameters": [
             { "name": "v", "type": 10, "storage": { "kind": "register", "value": "rcx" } }
           ],
-          "tags": ["imping-safe"] }
+          "tags": ["imping-safe"] },
+        { "name": "Spawn", "namespace": ["actors"], "rva": "0x16200", "calling_convention": "win64",
+          "return_type": 63,
+          "parameters": [
+            { "name": "actor", "type": 67, "storage": { "kind": "register", "value": "rcx" } },
+            { "name": "Rank", "type": 66, "storage": { "kind": "register", "value": "edx" } },
+            { "name": "RVA", "type": 6, "storage": { "kind": "register", "value": "r8d" } }
+          ] },
+        { "name": "Teleport", "rva": "0x16300", "calling_convention": "win64",
+          "return_type": 0,
+          "parameters": [
+            { "name": "gPlayer", "type": 16, "storage": { "kind": "register", "value": "rcx" } },
+            { "name": "EntityKind", "type": 11, "storage": { "kind": "register", "value": "edx" } },
+            { "name": "Original", "type": 8, "storage": { "kind": "register", "value": "xmm2" } },
+            { "name": "MODULE", "type": 5, "storage": { "kind": "register", "value": "r9d" } }
+          ] }
       ],
       "globals": [
         { "name": "gGravity", "rva": "0x3a1200", "type": 8 },
         { "name": "sCount", "namespace": ["Entity"], "rva": "0x3a1300", "type": 6 },
-        { "name": "gPlayer", "rva": "0x3a1400", "type": 16 }
+        { "name": "gPlayer", "rva": "0x3a1400", "type": 16 },
+        { "name": "sLocalPlayer", "namespace": ["actors"], "rva": "0x3a1500", "type": 63 }
       ],
       "vtables": [
         { "name": "Entity", "namespace": ["game"], "rva": "0x3b0040",

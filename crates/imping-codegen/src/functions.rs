@@ -10,15 +10,21 @@ use crate::Warning;
 use crate::emit::{doc, docs, hex, qualified};
 use crate::layout::Layouts;
 use crate::names::{self, Scope, doc_name, ident};
+use crate::namespaces::Namespace;
 use crate::types::{self, Text, TypeTable};
 use imping_ir::{Function, Global, TypeId, TypeKind};
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// The most parameters a hookable function may have; the hooking engine
 /// supports up to 14.
 const MAX_HOOK_PARAMETERS: usize = 14;
+
+/// The items of a function's own module that its parameters could clash with
+/// in Rust patterns: its constants, its `SLOT` static and the tuple struct
+/// `Original`.
+const FUNCTION_MODULE_VALUES: &[&str] = &["RVA", "VERIFICATION", "SLOT", "Original"];
 
 /// The function tag that marks a function as safe to call with valid
 /// arguments: it has no other preconditions (any time, any thread) and does
@@ -26,93 +32,19 @@ const MAX_HOOK_PARAMETERS: usize = 14;
 /// call wrapper whose pointer parameters are references.
 pub(crate) const SAFE_TAG: &str = "imping-safe";
 
-/// The functions and globals of one namespace, and its child namespaces.
-struct Namespace {
-    ir_name: String,
-    rust_name: String,
-    scope: Scope,
-    items: Vec<TokenStream>,
-    children: Vec<Namespace>,
-    index: HashMap<String, usize>,
-}
-
-impl Namespace {
-    fn new(ir_name: String, rust_name: String, scope: Scope) -> Self {
-        Self {
-            ir_name,
-            rust_name,
-            scope,
-            items: Vec::new(),
-            children: Vec::new(),
-            index: HashMap::new(),
-        }
-    }
-
-    /// The namespace at `path` below this one, created if needed. A new
-    /// namespace's module name is claimed in its parent's scope.
-    fn at(&mut self, path: &[String]) -> &mut Namespace {
-        let Some((first, rest)) = path.split_first() else {
-            return self;
-        };
-        let index = match self.index.get(first) {
-            Some(&index) => index,
-            None => {
-                let rust_name = self.scope.claim_numbered(&names::snake_case(first));
-                self.children
-                    .push(Namespace::new(first.clone(), rust_name, Scope::default()));
-                self.index.insert(first.clone(), self.children.len() - 1);
-                self.children.len() - 1
-            }
-        };
-        self.children[index].at(rest)
-    }
-
-    /// The namespace as a `pub mod`, below the namespace `parent`.
-    fn into_module(self, parent: &[String]) -> TokenStream {
-        let mut path = parent.to_vec();
-        path.push(self.ir_name);
-        let doc = doc(format!(
-            "Functions and globals in the `{}` namespace.",
-            doc_name(&path.join("::"))
-        ));
-        let name = ident(&self.rust_name);
-        let items = self.items;
-        let children = self
-            .children
-            .into_iter()
-            .map(|child| child.into_module(&path));
-        quote! {
-            #doc
-            pub mod #name {
-                #(#items)*
-                #(#children)*
-            }
-        }
-    }
-}
-
-/// Emits a module's functions and globals: those without a namespace first,
-/// then one `pub mod` per top-level namespace.
+/// Adds a module's functions and globals to the namespace tree `root`, whose
+/// modules are already named and hold the types, and returns the whole tree:
+/// the root's items, then one `pub mod` per top-level namespace.
 ///
-/// `scope` is the module root's scope, in which the types already have their
-/// names. Within each scope, namespace modules claim names first, then
-/// functions in RVA order (so the first of an overload set keeps the plain
-/// name), then globals.
+/// Within each scope, functions claim names in RVA order (so the first of an
+/// overload set keeps the plain name), then globals.
 pub(crate) fn emit(
     table: &TypeTable<'_>,
     layouts: &Layouts,
-    scope: Scope,
+    mut root: Namespace,
     warnings: &mut Vec<Warning>,
 ) -> TokenStream {
     let module = table.module();
-    let mut root = Namespace::new(String::new(), String::new(), scope);
-    for function in &module.functions {
-        root.at(&function.namespace);
-    }
-    for global in &module.globals {
-        root.at(&global.namespace);
-    }
-
     let mut by_rva: Vec<usize> = (0..module.functions.len()).collect();
     by_rva.sort_by_key(|&index| (module.functions[index].rva, index));
     let mut function_names = vec![String::new(); module.functions.len()];
@@ -133,24 +65,33 @@ pub(crate) fn emit(
         })
         .collect();
 
+    // The names a parameter can't take in each namespace module: statics and
+    // tuple structs, which a parameter name would be read as a pattern for.
+    let mut values: HashMap<&[String], HashSet<&str>> = HashMap::new();
+    values.entry(&[]).or_default().insert("MODULE");
+    for (global, name) in module.globals.iter().zip(&global_names) {
+        values
+            .entry(global.namespace.as_slice())
+            .or_default()
+            .insert(name.as_str());
+    }
+    for (namespace, name) in table.tuple_struct_names() {
+        values.entry(namespace).or_default().insert(name);
+    }
+    let no_values = HashSet::new();
+
     for (function, name) in module.functions.iter().zip(&function_names) {
-        let item = emit_function(table, layouts, function, name, warnings);
+        let taken = values
+            .get(function.namespace.as_slice())
+            .unwrap_or(&no_values);
+        let item = emit_function(table, layouts, function, name, taken, warnings);
         root.at(&function.namespace).items.push(item);
     }
     for (global, name) in module.globals.iter().zip(&global_names) {
         let item = emit_global(table, global, name);
         root.at(&global.namespace).items.push(item);
     }
-
-    let items = root.items;
-    let children = root
-        .children
-        .into_iter()
-        .map(|child| child.into_module(&[]));
-    quote! {
-        #(#items)*
-        #(#children)*
-    }
+    root.into_tokens()
 }
 
 /// `super::` repeated `depth` times: the path from a module `depth` levels
@@ -281,11 +222,16 @@ fn safe_parameter(
 
 /// The function's parameters, or why one can't be passed. A `void`
 /// parameter means "no parameters", as in C, and is dropped.
+///
+/// A parameter named like a static or tuple struct in its scope (`taken` in
+/// the namespace module, [`FUNCTION_MODULE_VALUES`] in the function's module)
+/// gets a trailing `_`, since Rust would read the name as a pattern for it.
 fn parameters(
     table: &TypeTable<'_>,
     layouts: &Layouts,
     function: &Function,
     depth: usize,
+    taken: &HashSet<&str>,
 ) -> Result<Vec<Parameter>, String> {
     let mut scope = Scope::default();
     // Locals of the generated thunk.
@@ -303,8 +249,12 @@ fn parameters(
         if !by_value(table, layouts, parameter.type_id) {
             return Err(format!("parameter `{source_name}` has no known size"));
         }
+        let mut name = names::sanitize(&source_name);
+        if taken.contains(name.as_str()) || FUNCTION_MODULE_VALUES.contains(&name.as_str()) {
+            name.push('_');
+        }
         parameters.push(Parameter {
-            name: ident(&scope.claim_numbered(&names::sanitize(&source_name))),
+            name: ident(&scope.claim_numbered(&name)),
             outer: value_type(table, parameter.type_id, depth),
             inner: value_type(table, parameter.type_id, depth + 1),
             type_id: parameter.type_id,
@@ -321,6 +271,7 @@ fn emit_function(
     layouts: &Layouts,
     function: &Function,
     name: &str,
+    taken: &HashSet<&str>,
     warnings: &mut Vec<Warning>,
 ) -> TokenStream {
     let module = table.module();
@@ -372,7 +323,7 @@ fn emit_function(
         });
         TokenStream::new()
     };
-    let parameters = match parameters(table, layouts, function, depth) {
+    let parameters = match parameters(table, layouts, function, depth, taken) {
         Ok(parameters) => parameters,
         Err(reason) => return skip(reason, warnings),
     };

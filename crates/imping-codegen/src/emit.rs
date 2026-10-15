@@ -7,27 +7,39 @@ use crate::Warning;
 use crate::functions;
 use crate::layout::{BitKind, BitMember, Layouts, Member, Plan, Repr, StructPlan, UnionPlan};
 use crate::names::{self, Scope, doc_name, ident};
+use crate::namespaces::Namespace;
 use crate::types::{Integer, TypeTable};
 use imping_ir::{Architecture, EnumVariant, Field, Module, TypeDef, TypeId, TypeKind};
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote;
 use std::collections::HashSet;
 
-/// Emits the `pub mod` for one IR module: its identity and `init`, its types,
-/// then its functions and globals, grouped into namespace modules.
+/// Emits the `pub mod` for one IR module: its identity and `init`, then its
+/// types, functions and globals, each in the module of its namespace.
 pub(crate) fn module(module: &Module, rust_name: &str, warnings: &mut Vec<Warning>) -> TokenStream {
     let mut scope = Scope::default();
     scope.reserve("MODULE");
     scope.reserve("init");
-    let table = TypeTable::new(module, &mut scope);
+    // Namespaces of functions and globals come first, so giving types
+    // namespaces never renames the modules functions and globals already use.
+    let mut root = Namespace::root(scope);
+    for function in &module.functions {
+        root.register(&function.namespace);
+    }
+    for global in &module.globals {
+        root.register(&global.namespace);
+    }
+    let mut table = TypeTable::new(module, &mut root);
+    root.name_modules();
+    table.resolve_modules(&root);
     let layouts = Layouts::plan(&table);
 
-    let types: Vec<TokenStream> = module
-        .types
-        .iter()
-        .filter_map(|def| type_item(&table, &layouts, def, warnings))
-        .collect();
-    let code = functions::emit(&table, &layouts, scope, warnings);
+    for def in &module.types {
+        if let Some(item) = type_item(&table, &layouts, def, warnings) {
+            root.at(&def.namespace).items.push(item);
+        }
+    }
+    let code = functions::emit(&table, &layouts, root, warnings);
     for vtable in &module.vtables {
         warnings.push(Warning::VtableSkipped {
             module: module.name.clone(),
@@ -52,7 +64,6 @@ pub(crate) fn module(module: &Module, rust_name: &str, warnings: &mut Vec<Warnin
         #[allow(non_snake_case, non_camel_case_types, non_upper_case_globals, dead_code, clippy::all)]
         pub mod #name {
             #identity
-            #(#types)*
             #code
         }
     }
@@ -133,7 +144,7 @@ fn type_item(
         },
         TypeKind::Struct { size, fields, .. } | TypeKind::Union { size, fields, .. } => {
             match layouts.get(def.id) {
-                Plan::Struct(plan) => structure(table, def, *size, fields, plan),
+                Plan::Struct(plan) => structure(table, layouts, def, *size, fields, plan),
                 Plan::Union(plan) => union(table, def, *size, fields, plan),
                 Plan::Opaque {
                     size,
@@ -191,43 +202,103 @@ fn plain_impl(table: &TypeTable<'_>, layouts: &Layouts, def: &TypeDef) -> Option
 fn warn_opaque(table: &TypeTable<'_>, def: &TypeDef, reason: &str, warnings: &mut Vec<Warning>) {
     warnings.push(Warning::TypeMadeOpaque {
         module: table.module().name.clone(),
-        type_name: def.name.clone(),
+        type_name: table.source_name(def.id),
         reason: reason.to_owned(),
     });
 }
 
+/// The source name of a type for its docs, with its namespace.
+fn shown(table: &TypeTable<'_>, def: &TypeDef) -> String {
+    doc_name(&table.source_name(def.id))
+}
+
 fn typedef(table: &TypeTable<'_>, def: &TypeDef, target: TypeId) -> TokenStream {
     let name = ident(table.name(def.id));
-    let target = table.rust_type(target, 0);
-    let doc = doc(format!("Typedef `{}`.", doc_name(&def.name)));
+    let target = table.rust_type(target, def.namespace.len());
+    let doc = doc(format!("Typedef `{}`.", shown(table, def)));
     quote! {
         #doc
         pub type #name = #target;
     }
 }
 
+/// A struct's base class: its field the IR marks as the base, if that field
+/// is a struct at offset 0 and the struct is laid out without packing (a
+/// packed struct's base may sit at an address its type can't be aligned to).
+/// Any other `base` mark is ignored.
+fn base_field<'a>(
+    table: &TypeTable<'a>,
+    layouts: &Layouts,
+    id: TypeId,
+) -> Option<(usize, &'a Field)> {
+    let TypeKind::Struct { fields, .. } = &table.get(id).kind else {
+        return None;
+    };
+    let Plan::Struct(plan) = layouts.get(id) else {
+        return None;
+    };
+    if plan.repr == Repr::Packed {
+        return None;
+    }
+    let (index, field) = fields.iter().enumerate().find(|(_, field)| field.base)?;
+    let is_struct = table
+        .peel(field.type_id)
+        .is_some_and(|def| matches!(def.kind, TypeKind::Struct { .. }));
+    let emitted = plan
+        .members
+        .iter()
+        .any(|member| matches!(member, Member::Field { index: i, .. } if *i == index));
+    (field.offset == 0 && field.bits.is_none() && is_struct && emitted).then_some((index, field))
+}
+
+/// The base classes of a struct whose base field is `base`: the direct base
+/// first, then each base's own base, as written types (typedefs kept).
+fn ancestors(table: &TypeTable<'_>, layouts: &Layouts, base: &Field) -> Vec<TypeId> {
+    let mut chain = vec![base.type_id];
+    let mut seen = HashSet::new();
+    let mut current = table.peel(base.type_id).map(|def| def.id);
+    while let Some(id) = current {
+        if !seen.insert(id.0) {
+            break;
+        }
+        let Some((_, next)) = base_field(table, layouts, id) else {
+            break;
+        };
+        chain.push(next.type_id);
+        current = table.peel(next.type_id).map(|def| def.id);
+    }
+    chain
+}
+
 fn structure(
     table: &TypeTable<'_>,
+    layouts: &Layouts,
     def: &TypeDef,
     size: u64,
     fields: &[Field],
     plan: &StructPlan,
 ) -> TokenStream {
     let name = ident(table.name(def.id));
+    let depth = def.namespace.len();
+    let base = base_field(table, layouts, def.id);
     let mut scope = Scope::default();
     let mut methods = Scope::default();
     let mut members = Vec::new();
     let mut offsets = Vec::new();
     let mut accessors = Vec::new();
+    let mut base_ident = None;
 
     for member in &plan.members {
         match member {
             Member::Field { index, offset } => {
                 let field = &fields[*index];
                 let field_ident = ident(&scope.claim_numbered(&names::sanitize(&field.name)));
-                let ty = table.rust_type(field.type_id, 0);
+                let ty = table.rust_type(field.type_id, depth);
                 let doc = doc(format!("`{}` at `{offset:#x}`.", doc_name(&field.name)));
                 members.push(quote! { #doc pub #field_ident: #ty });
+                if base.is_some_and(|(base_index, _)| base_index == *index) {
+                    base_ident = Some(field_ident.clone());
+                }
                 offsets.push((field_ident, *offset));
             }
             Member::Padding { offset, len } => {
@@ -260,6 +331,7 @@ fn structure(
                         storage_field: &field_ident,
                         storage: *storage,
                         offset: *offset,
+                        depth,
                     };
                     accessors.push(accessor.emit(&mut methods));
                 }
@@ -271,9 +343,23 @@ fn structure(
     let (repr, note) = repr_attribute(plan.repr);
     let mut paragraphs = vec![format!(
         "`{}`: {size} bytes, align {}.",
-        doc_name(&def.name),
+        shown(table, def),
         plan.align
     )];
+    let inheritance = base.zip(base_ident).map(|((_, field), field_ident)| {
+        let chain = ancestors(table, layouts, field);
+        let base_name = table.peel(field.type_id).map_or_else(
+            || table.source_name(field.type_id),
+            |def| table.source_name(def.id),
+        );
+        paragraphs.push(format!(
+            "Derives from `{}`, its field `{}`: it derefs to it, and implements \
+             `imping_runtime::Inherits` for it and its own bases.",
+            doc_name(&base_name),
+            doc_name(&field.name)
+        ));
+        inheritance(table, &name, &field_ident, &chain, depth)
+    });
     paragraphs.extend(note);
     let doc = docs(&paragraphs);
     let default = zeroed_default(&name);
@@ -294,7 +380,56 @@ fn structure(
         }
         #default
         #accessors
+        #inheritance
         #asserts
+    }
+}
+
+/// `Deref` and `DerefMut` to a struct's base field, and `Inherits` for each
+/// type in `chain`: the direct base first, then its bases in turn.
+fn inheritance(
+    table: &TypeTable<'_>,
+    name: &Ident,
+    field: &Ident,
+    chain: &[TypeId],
+    depth: usize,
+) -> TokenStream {
+    let base = table.rust_type(chain[0], depth);
+    let names: Vec<String> = chain
+        .iter()
+        .map(|&id| {
+            let shown = table.peel(id).map_or(id, |def| def.id);
+            format!("`{}`", doc_name(&table.source_name(shown)))
+        })
+        .collect();
+    let impls = chain.iter().enumerate().map(|(level, &id)| {
+        let ty = table.rust_type(id, depth);
+        let reason = if level == 0 {
+            format!(" SAFETY: `{name}` is `repr(C)` and its field `{field}` at offset 0 is its base {}.", names[0])
+        } else {
+            format!(
+                " SAFETY: `{name}` is `repr(C)` and begins with {}, each at offset 0.",
+                names[..=level].join(", which begins with ")
+            )
+        };
+        quote! {
+            #[comment = #reason]
+            unsafe impl ::imping_runtime::Inherits<#ty> for #name {}
+        }
+    });
+    quote! {
+        impl ::core::ops::Deref for #name {
+            type Target = #base;
+            fn deref(&self) -> &Self::Target {
+                &self.#field
+            }
+        }
+        impl ::core::ops::DerefMut for #name {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                &mut self.#field
+            }
+        }
+        #(#impls)*
     }
 }
 
@@ -313,7 +448,7 @@ fn union(
         .map(|&index| {
             let field = &fields[index];
             let field_ident = ident(&scope.claim_numbered(&names::sanitize(&field.name)));
-            let ty = table.rust_type(field.type_id, 0);
+            let ty = table.rust_type(field.type_id, def.namespace.len());
             let doc = doc(format!("`{}` at `0x0`.", doc_name(&field.name)));
             quote! { #doc pub #field_ident: #ty }
         })
@@ -330,7 +465,7 @@ fn union(
     let (repr, note) = repr_attribute(plan.repr);
     let mut paragraphs = vec![format!(
         "`{}`: union, {size} bytes, align {}.",
-        doc_name(&def.name),
+        shown(table, def),
         plan.align
     )];
     paragraphs.extend(note);
@@ -382,7 +517,7 @@ fn enumeration(
             text.push_str(&format!(" in the IR, truncated to fit `{ty}`"));
             warnings.push(Warning::EnumValueTruncated {
                 module: table.module().name.clone(),
-                enum_name: def.name.clone(),
+                enum_name: table.source_name(def.id),
                 variant: variant.name.clone(),
                 value: variant.value,
             });
@@ -397,7 +532,7 @@ fn enumeration(
         }
     }
 
-    let doc = doc(format!("`{}`: enum over `{ty}`.", doc_name(&def.name)));
+    let doc = doc(format!("`{}`: enum over `{ty}`.", shown(table, def)));
     let fallback = Literal::string(&format!("{bare_name}({{value}})"));
     quote! {
         #doc
@@ -469,7 +604,7 @@ fn opaque_bytes(
 ) -> TokenStream {
     let name = ident(table.name(def.id));
     let field_doc = doc(format!("Unknown bytes `0x0..{size:#x}`."));
-    let item_doc = doc(format!("`{}`: {explanation}", doc_name(&def.name)));
+    let item_doc = doc(format!("`{}`: {explanation}", shown(table, def)));
     let repr = if align > 1 {
         repr_attribute(Repr::Align(align)).0
     } else {
@@ -494,7 +629,7 @@ fn opaque_bytes(
 /// A zero-sized, `!Send`, `!Sync`, `!Unpin` type usable only behind pointers.
 fn opaque_marker(table: &TypeTable<'_>, def: &TypeDef, explanation: &str) -> TokenStream {
     let name = ident(table.name(def.id));
-    let doc = doc(format!("`{}`: {explanation}", doc_name(&def.name)));
+    let doc = doc(format!("`{}`: {explanation}", shown(table, def)));
     quote! {
         #doc
         #[repr(C)]
@@ -513,6 +648,8 @@ struct BitAccessor<'t, 'a> {
     storage_field: &'t Ident,
     storage: Integer,
     offset: u64,
+    /// How many modules below the bindings' root the struct is emitted.
+    depth: usize,
 }
 
 /// An expression, and whether it needs parentheses as an operand.
@@ -564,12 +701,12 @@ impl BitAccessor<'_, '_> {
                 )
             }
             BitKind::Integer(integer) => (
-                self.table.rust_type(self.field.type_id, 0),
+                self.table.rust_type(self.field.type_id, self.depth),
                 self.read_integer(integer).tokens,
                 self.to_storage(quote! { value }, Some(integer)),
             ),
             BitKind::Enum { id, integer } => {
-                let path = self.table.path(id, 0);
+                let path = self.table.path(id, self.depth);
                 let inner = self.read_integer(integer).tokens;
                 (
                     path.clone(),

@@ -1,7 +1,9 @@
 //! A module's type table: lookups, the Rust names of type items, and the Rust
 //! type expression for any type id.
 
-use crate::names::{self, Scope};
+use crate::emit::qualified;
+use crate::names;
+use crate::namespaces::Namespace;
 use imping_ir::{Architecture, CallingConvention, Module, Primitive, TypeDef, TypeId, TypeKind};
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
@@ -10,26 +12,33 @@ use std::collections::HashMap;
 /// How many typedefs [`TypeTable::peel`] follows before assuming a cycle.
 const MAX_TYPEDEF_DEPTH: usize = 64;
 
-/// One IR module's types, indexed, with the Rust names of those emitted as
-/// items.
+/// One IR module's types, indexed, with the Rust names and module paths of
+/// those emitted as items.
 pub(crate) struct TypeTable<'a> {
     module: &'a Module,
     by_id: HashMap<u32, &'a TypeDef>,
     /// Rust names of the types emitted as items.
     names: HashMap<u32, String>,
+    /// The Rust modules, from the bindings' root, holding each item type.
+    modules: HashMap<u32, Vec<String>>,
 }
 
 impl<'a> TypeTable<'a> {
-    /// Indexes `module`'s types and claims a name in `scope` for every type
-    /// emitted as an item, lowest type id first; a clashing name gets the
-    /// type id as a suffix.
-    pub(crate) fn new(module: &'a Module, scope: &mut Scope) -> Self {
+    /// Indexes `module`'s types, registers the namespace of every type
+    /// emitted as an item in `root`, and claims the type's name in that
+    /// namespace's scope, lowest type id first; a clashing name gets the type
+    /// id as a suffix.
+    ///
+    /// The module paths are known only once `root` has named its modules;
+    /// call [`TypeTable::resolve_modules`] then.
+    pub(crate) fn new(module: &'a Module, root: &mut Namespace) -> Self {
         let by_id: HashMap<u32, &TypeDef> =
             module.types.iter().map(|def| (def.id.0, def)).collect();
         let mut table = Self {
             module,
             by_id,
             names: HashMap::new(),
+            modules: HashMap::new(),
         };
 
         let mut defs: Vec<&TypeDef> = module.types.iter().collect();
@@ -38,15 +47,41 @@ impl<'a> TypeTable<'a> {
             if !table.is_item_kind(def) {
                 continue;
             }
+            root.register(&def.namespace);
             let base = names::sanitize(&def.name);
             let id = def.id.0;
-            let name = scope.claim(&base, |n| match n {
+            let name = root.at(&def.namespace).scope.claim(&base, |n| match n {
                 2 => format!("{base}_{id}"),
                 _ => format!("{base}_{id}_{n}"),
             });
             table.names.insert(id, name);
         }
         table
+    }
+
+    /// Records the module path of every item type, once `root` has named its
+    /// modules.
+    pub(crate) fn resolve_modules(&mut self, root: &Namespace) {
+        for &id in self.names.keys() {
+            let namespace = &self.by_id[&id].namespace;
+            self.modules.insert(id, root.module_path(namespace));
+        }
+    }
+
+    /// The names of the tuple structs (enum newtypes) emitted into each
+    /// namespace. A function parameter can't take one of these names.
+    pub(crate) fn tuple_struct_names(&self) -> Vec<(&'a [String], &str)> {
+        self.names
+            .iter()
+            .filter(|(id, _)| matches!(self.by_id[id].kind, TypeKind::Enum { .. }))
+            .map(|(id, name)| (self.by_id[id].namespace.as_slice(), name.as_str()))
+            .collect()
+    }
+
+    /// The type's source name with its namespace, for docs and messages.
+    pub(crate) fn source_name(&self, id: TypeId) -> String {
+        let def = self.get(id);
+        qualified(&def.namespace, &def.name)
     }
 
     /// The IR module these types belong to.
@@ -112,7 +147,11 @@ impl<'a> TypeTable<'a> {
                 // A typedef cycle is emitted as an opaque item.
                 None => true,
                 Some(peeled) if matches!(peeled.kind, TypeKind::Function { .. }) => false,
-                Some(_) => names::sanitize(&def.name) != names::sanitize(&self.get(target).name),
+                Some(_) => {
+                    let target = self.get(target);
+                    names::sanitize(&def.name) != names::sanitize(&target.name)
+                        || def.namespace != target.namespace
+                }
             },
         }
     }
@@ -206,11 +245,18 @@ impl<'a> TypeTable<'a> {
         }
     }
 
-    /// The path to a type item from `depth` levels below the module root.
+    /// The path to a type item from `depth` levels below the module root: up
+    /// to the root, then down the type's namespace modules.
     pub(crate) fn path(&self, id: TypeId, depth: usize) -> TokenStream {
         let name = names::ident(self.name(id));
         let supers = (0..depth).map(|_| quote! { super:: });
-        quote! { #(#supers)* #name }
+        let modules = self
+            .modules
+            .get(&id.0)
+            .unwrap_or_else(|| panic!("type id {} has no resolved module", id.0))
+            .iter()
+            .map(|module| names::ident(module));
+        quote! { #(#supers)* #(#modules::)* #name }
     }
 
     /// The nullable function-pointer type for a function type.

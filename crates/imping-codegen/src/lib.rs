@@ -5,16 +5,24 @@
 //!
 //! - Each module gets a `MODULE` identity and an `init()` that checks the
 //!   running build against it.
+//! - Types, functions and globals are emitted in one module per namespace
+//!   (`game::hw::cVec4` for the type `Hw::cVec4`).
 //! - Structs become `#[repr(C)]` structs with explicit padding, bitfield
 //!   accessors and compile-time assertions on size, alignment and every field
 //!   offset; unions get the same assertions.
+//! - A struct whose IR field is marked as its base class (a struct at offset
+//!   0) derefs to that base and implements `imping_runtime::Inherits` for it
+//!   and the base's own bases, so `upcast()` turns pointers into base
+//!   pointers.
 //! - Enums become integer newtypes with associated constants.
 //! - Typedefs become type aliases, and opaque types become byte arrays or
 //!   zero-sized markers.
 //! - Functions become an `unsafe fn` plus a module of the same name with the
 //!   function's `RVA`, `Signature`, `ptr()` and `hook()`, inside one module per
 //!   namespace. A hook's closure receives the function's `Original` first:
-//!   `original.forward()` safely makes the call the target was making.
+//!   `original.forward()` safely makes the call the target was making. A
+//!   parameter named like a static or enum type in its module gets a trailing
+//!   `_`.
 //! - Functions with the function tag `imping-safe` get a safe `fn` instead,
 //!   whose pointer parameters are references, unless a parameter has no safe
 //!   form (a [`Warning`] says so). The tag means: with valid arguments the
@@ -56,6 +64,7 @@ mod format;
 mod functions;
 mod layout;
 mod names;
+mod namespaces;
 mod types;
 
 pub use crate::error::{Error, Warning};

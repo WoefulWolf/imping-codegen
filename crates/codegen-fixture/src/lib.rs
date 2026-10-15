@@ -324,3 +324,76 @@ mod tests {
         assert_eq!(entity.health, 6.0);
     }
 }
+
+/// Types in namespaces, base classes, and parameters renamed around clashes.
+#[cfg(test)]
+mod classes {
+    use super::game::actors::{Actor, Player, Rank};
+    use super::game::{Entity, EntityKind, PackedBase};
+    use imping_runtime::{Inherits, Upcast};
+
+    fn inherits<T: Inherits<B>, B>() {}
+
+    #[test]
+    fn classes_inherit_every_ancestor() {
+        inherits::<Actor, Entity>();
+        inherits::<Player, Actor>();
+        inherits::<Player, Entity>();
+    }
+
+    #[test]
+    fn base_fields_are_reachable_through_deref() {
+        let mut player = Player {
+            score: 7,
+            rank: Rank::Gold,
+            ..Player::default()
+        };
+        player.speed = 2.5;
+        player.kind = EntityKind::Npc;
+        assert_eq!(player.base.speed, 2.5);
+        assert_eq!(player.base.base.kind, EntityKind::Npc);
+        assert_eq!((player.score, player.rank), (7, Rank::Gold));
+    }
+
+    #[test]
+    fn references_coerce_to_base_references() {
+        fn kind(entity: &Entity) -> EntityKind {
+            entity.kind
+        }
+        let mut player = Player {
+            score: 1,
+            ..Player::default()
+        };
+        player.kind = EntityKind::Player;
+        assert_eq!(kind(&player), EntityKind::Player);
+    }
+
+    #[test]
+    fn pointers_upcast_to_every_ancestor() {
+        let mut player = Player::default();
+        let pointer: *mut Player = &mut player;
+        let actor: *mut Actor = pointer.upcast();
+        let entity = pointer.upcast::<Entity>();
+        assert_eq!(actor.cast::<Player>(), pointer);
+        assert_eq!(entity.cast::<Player>(), pointer);
+    }
+
+    #[test]
+    fn ignored_base_marks_leave_plain_fields() {
+        // `Item`'s field `base` is not at offset 0, and `PackedBase` is packed:
+        // both keep `base` as an ordinary field.
+        let item = super::game::actors::Item::default();
+        let packed = PackedBase::default();
+        let _ = (item.base, { packed.base });
+    }
+
+    #[test]
+    fn namespaced_items_and_renamed_parameters() {
+        assert_eq!(super::game::actors::Spawn::RVA, 0x16200);
+        assert_eq!(super::game::actors::sLocalPlayer.rva(), 0x3a1500);
+        // `Rank` and `RVA` are renamed `Rank_` and `RVA_`, which only the
+        // generated code sees; the signatures keep their types.
+        let _: unsafe fn(*mut Actor, Rank, u32) -> *mut Player = super::game::actors::Spawn;
+        let _: unsafe fn(*mut Entity, EntityKind, f32, i32) = super::game::Teleport;
+    }
+}

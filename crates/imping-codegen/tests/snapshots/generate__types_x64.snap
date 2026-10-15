@@ -701,6 +701,38 @@ pub mod game {
     /// Typedef `LPCSTR`.
     pub type LPCSTR = ::imping_runtime::CStrPtr;
 
+    /// `PackedBase`: 17 bytes, align 1.
+    ///
+    /// Packed: the IR places a member where `repr(C)` alignment can't.
+    #[repr(C, packed)]
+    #[derive(Clone, Copy, Debug)]
+    pub struct PackedBase {
+        /// `base` at `0x0`.
+        pub base: Vector3,
+        /// `tag` at `0xc`.
+        pub tag: u8,
+        /// `count` at `0xd`.
+        pub count: u32,
+    }
+
+    impl ::core::default::Default for PackedBase {
+        /// All fields zero.
+        fn default() -> Self {
+            // SAFETY: every field type is valid when all-zero.
+            unsafe { ::core::mem::zeroed() }
+        }
+    }
+
+    const _: () = {
+        ::core::assert!(::core::mem::size_of::<PackedBase>() == 0x11);
+        ::core::assert!(::core::mem::align_of::<PackedBase>() == 0x1);
+        ::core::assert!(::core::mem::offset_of!(PackedBase, base) == 0x0);
+        ::core::assert!(::core::mem::offset_of!(PackedBase, tag) == 0xc);
+        ::core::assert!(::core::mem::offset_of!(PackedBase, count) == 0xd);
+    };
+
+    // SAFETY: every field is plain data, so every bit pattern is a valid value.
+    unsafe impl ::imping_runtime::Plain for PackedBase {}
     /// `GetPlayer` at `game.exe+0x15200`.
     ///
     /// # Safety
@@ -887,6 +919,141 @@ pub mod game {
         }
     }
 
+    /// `Teleport` at `game.exe+0x16300`.
+    ///
+    /// # Safety
+    ///
+    /// Calls into `game.exe`: its `init()` must have succeeded, and the arguments must be valid for this function.
+    ///
+    /// # Panics
+    ///
+    /// If `game.exe`'s `init()` has not succeeded.
+    pub unsafe fn Teleport(
+        gPlayer_: *mut Entity,
+        EntityKind_: EntityKind,
+        Original_: f32,
+        MODULE_: i32,
+    ) {
+        // SAFETY: forwarded to the caller.
+        unsafe { Teleport::ptr()(gPlayer_, EntityKind_, Original_, MODULE_) }
+    }
+
+    /// Address, signature and hook of `Teleport`.
+    pub mod Teleport {
+        /// The function's address relative to `game.exe`'s base.
+        pub const RVA: u32 = 0x16300;
+        /// The function's type.
+        pub type Signature = unsafe extern "system" fn(
+            gPlayer_: *mut super::Entity,
+            EntityKind_: super::EntityKind,
+            Original_: f32,
+            MODULE_: i32,
+        );
+
+        /// The function's address in this process.
+        ///
+        /// # Panics
+        ///
+        /// If `game.exe`'s `init()` has not succeeded.
+        pub fn ptr() -> Signature {
+            // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
+            unsafe {
+                ::core::mem::transmute::<usize, Signature>(super::MODULE.address(RVA))
+            }
+        }
+
+        /// The original `Teleport`, handed to a hook's `detour` with the arguments of the call being hooked. It can only be used during that call.
+        pub struct Original<'call>(
+            Signature,
+            (*mut super::Entity, super::EntityKind, f32, i32),
+            ::core::marker::PhantomData<&'call ()>,
+        );
+
+        impl Original<'_> {
+            /// Calls the original function with the arguments the target passed to the hooked call.
+            pub fn forward(self) {
+                let (gPlayer_, EntityKind_, Original_, MODULE_) = self.1;
+                // SAFETY: these are the arguments the target passed to the hooked call, so this is the call it was making; `init`'s caller promised the function has type `Signature`.
+                unsafe { (self.0)(gPlayer_, EntityKind_, Original_, MODULE_) }
+            }
+
+            /// Calls the original function with other arguments.
+            ///
+            /// # Safety
+            ///
+            /// The arguments must be valid for this function.
+            pub unsafe fn call(
+                self,
+                gPlayer_: *mut super::Entity,
+                EntityKind_: super::EntityKind,
+                Original_: f32,
+                MODULE_: i32,
+            ) {
+                // SAFETY: forwarded to the caller.
+                unsafe { (self.0)(gPlayer_, EntityKind_, Original_, MODULE_) }
+            }
+        }
+
+        static SLOT: ::imping_runtime::__private::Slot<
+            dyn for<'call> Fn(
+                Original<'call>,
+                *mut super::Entity,
+                super::EntityKind,
+                f32,
+                i32,
+            ) + Send + Sync,
+            Signature,
+        > = ::imping_runtime::__private::Slot::new();
+        unsafe extern "system" fn thunk(
+            gPlayer_: *mut super::Entity,
+            EntityKind_: super::EntityKind,
+            Original_: f32,
+            MODULE_: i32,
+        ) {
+            let (detour, original) = SLOT.get();
+            detour(
+                Original(
+                    original,
+                    (gPlayer_, EntityKind_, Original_, MODULE_),
+                    ::core::marker::PhantomData,
+                ),
+                gPlayer_,
+                EntityKind_,
+                Original_,
+                MODULE_,
+            )
+        }
+
+        /// Hooks `Teleport`: once enabled, every call runs `detour`, which receives an `Original` first, then the arguments. `original.forward()` calls the original function with the arguments the target passed; `original.call(..)` calls it with other ones.
+        ///
+        /// The hook is returned disabled; enable it with `Hook::enable`. Dropping the guard disables it, after which the function can be hooked again. A panic inside `detour` aborts the process.
+        ///
+        /// # Errors
+        ///
+        /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, or if patching fails.
+        pub fn hook(
+            detour: impl for<'call> Fn(
+                Original<'call>,
+                *mut super::Entity,
+                super::EntityKind,
+                f32,
+                i32,
+            ) + Send + Sync + 'static,
+        ) -> ::imping_runtime::Result<::imping_runtime::Hook<Signature>> {
+            // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
+            unsafe {
+                ::imping_runtime::__private::install(
+                    &super::MODULE,
+                    RVA,
+                    &[],
+                    &SLOT,
+                    ::std::boxed::Box::new(detour),
+                    thunk,
+                )
+            }
+        }
+    }
+
     /// `gGravity` at `game.exe+0x3a1200`.
     pub static gGravity: ::imping_runtime::Global<f32> = ::imping_runtime::Global::new(
         &MODULE,
@@ -899,7 +1066,7 @@ pub mod game {
         0x3a1400,
     );
 
-    /// Functions and globals in the `Entity` namespace.
+    /// The `Entity` namespace.
     pub mod entity {
         /// `Entity::Update` at `game.exe+0x15040`. Tags: `hot`, `ai`.
         ///
@@ -1351,7 +1518,7 @@ pub mod game {
         );
     }
 
-    /// Functions and globals in the `util` namespace.
+    /// The `util` namespace.
     pub mod util {
         /// `util::Log` at `game.exe+0x15a00`.
         ///
@@ -1733,9 +1900,9 @@ pub mod game {
         }
     }
 
-    /// Functions and globals in the `Game` namespace.
+    /// The `Game` namespace.
     pub mod game {
-        /// Functions and globals in the `Game::World` namespace.
+        /// The `Game::World` namespace.
         pub mod world {
             /// `Game::World::Tick` at `game.exe+0x16000`.
             ///
@@ -1834,7 +2001,7 @@ pub mod game {
         }
     }
 
-    /// Functions and globals in the `ui` namespace.
+    /// The `ui` namespace.
     pub mod ui {
         /// `ui::SetTitle` at `game.exe+0x16200`. Tags: `imping-safe`.
         ///
@@ -2068,7 +2235,7 @@ pub mod game {
         }
     }
 
-    /// Functions and globals in the `math` namespace.
+    /// The `math` namespace.
     pub mod math {
         /// `math::Normalize` at `game.exe+0x16100`. Tags: `imping-safe`.
         ///
@@ -2174,5 +2341,287 @@ pub mod game {
                 }
             }
         }
+    }
+
+    /// The `actors` namespace.
+    pub mod actors {
+        /// `actors::Actor`: 72 bytes, align 8.
+        ///
+        /// Derives from `Entity`, its field `base`: it derefs to it, and implements `imping_runtime::Inherits` for it and its own bases.
+        #[repr(C)]
+        #[derive(Clone, Copy, Debug)]
+        pub struct Actor {
+            /// `base` at `0x0`.
+            pub base: super::Entity,
+            /// `speed` at `0x40`.
+            pub speed: f32,
+            /// `flags` at `0x44`.
+            pub flags: u32,
+        }
+
+        impl ::core::default::Default for Actor {
+            /// All fields zero.
+            fn default() -> Self {
+                // SAFETY: every field type is valid when all-zero.
+                unsafe { ::core::mem::zeroed() }
+            }
+        }
+
+        impl ::core::ops::Deref for Actor {
+            type Target = super::Entity;
+            fn deref(&self) -> &Self::Target {
+                &self.base
+            }
+        }
+
+        impl ::core::ops::DerefMut for Actor {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                &mut self.base
+            }
+        }
+
+        // SAFETY: `Actor` is `repr(C)` and its field `base` at offset 0 is its base `Entity`.
+        unsafe impl ::imping_runtime::Inherits<super::Entity> for Actor {}
+        const _: () = {
+            ::core::assert!(::core::mem::size_of::<Actor>() == 0x48);
+            ::core::assert!(::core::mem::align_of::<Actor>() == 0x8);
+            ::core::assert!(::core::mem::offset_of!(Actor, base) == 0x0);
+            ::core::assert!(::core::mem::offset_of!(Actor, speed) == 0x40);
+            ::core::assert!(::core::mem::offset_of!(Actor, flags) == 0x44);
+        };
+
+        /// `actors::Player`: 80 bytes, align 8.
+        ///
+        /// Derives from `actors::Actor`, its field `base`: it derefs to it, and implements `imping_runtime::Inherits` for it and its own bases.
+        #[repr(C)]
+        #[derive(Clone, Copy, Debug)]
+        pub struct Player {
+            /// `base` at `0x0`.
+            pub base: super::actors::Actor,
+            /// `score` at `0x48`.
+            pub score: i32,
+            /// `rank` at `0x4c`.
+            pub rank: super::actors::Rank,
+        }
+
+        impl ::core::default::Default for Player {
+            /// All fields zero.
+            fn default() -> Self {
+                // SAFETY: every field type is valid when all-zero.
+                unsafe { ::core::mem::zeroed() }
+            }
+        }
+
+        impl ::core::ops::Deref for Player {
+            type Target = super::actors::Actor;
+            fn deref(&self) -> &Self::Target {
+                &self.base
+            }
+        }
+
+        impl ::core::ops::DerefMut for Player {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                &mut self.base
+            }
+        }
+
+        // SAFETY: `Player` is `repr(C)` and its field `base` at offset 0 is its base `actors::Actor`.
+        unsafe impl ::imping_runtime::Inherits<super::actors::Actor> for Player {}
+        // SAFETY: `Player` is `repr(C)` and begins with `actors::Actor`, which begins with `Entity`, each at offset 0.
+        unsafe impl ::imping_runtime::Inherits<super::Entity> for Player {}
+        const _: () = {
+            ::core::assert!(::core::mem::size_of::<Player>() == 0x50);
+            ::core::assert!(::core::mem::align_of::<Player>() == 0x8);
+            ::core::assert!(::core::mem::offset_of!(Player, base) == 0x0);
+            ::core::assert!(::core::mem::offset_of!(Player, score) == 0x48);
+            ::core::assert!(::core::mem::offset_of!(Player, rank) == 0x4c);
+        };
+
+        /// `actors::Item`: 16 bytes, align 4.
+        #[repr(C)]
+        #[derive(Clone, Copy, Debug)]
+        pub struct Item {
+            /// `count` at `0x0`.
+            pub count: i32,
+            /// `base` at `0x4`.
+            pub base: super::Vector3,
+        }
+
+        impl ::core::default::Default for Item {
+            /// All fields zero.
+            fn default() -> Self {
+                // SAFETY: every field type is valid when all-zero.
+                unsafe { ::core::mem::zeroed() }
+            }
+        }
+
+        const _: () = {
+            ::core::assert!(::core::mem::size_of::<Item>() == 0x10);
+            ::core::assert!(::core::mem::align_of::<Item>() == 0x4);
+            ::core::assert!(::core::mem::offset_of!(Item, count) == 0x0);
+            ::core::assert!(::core::mem::offset_of!(Item, base) == 0x4);
+        };
+
+        // SAFETY: every field is plain data, so every bit pattern is a valid value.
+        unsafe impl ::imping_runtime::Plain for Item {}
+        /// `actors::Rank`: enum over `u32`.
+        #[repr(transparent)]
+        #[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        pub struct Rank(pub u32);
+
+        impl Rank {
+            /// `Bronze` = 0.
+            pub const Bronze: Self = Self(0);
+            /// `Gold` = 2.
+            pub const Gold: Self = Self(2);
+        }
+
+        impl ::core::fmt::Debug for Rank {
+            fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                match *self {
+                    Self::Bronze => f.write_str("Bronze"),
+                    Self::Gold => f.write_str("Gold"),
+                    Self(value) => ::core::write!(f, "Rank({value})"),
+                }
+            }
+        }
+
+        // SAFETY: a transparent wrapper of an integer.
+        unsafe impl ::imping_runtime::Plain for Rank {}
+        /// `actors::Spawn` at `game.exe+0x16200`.
+        ///
+        /// # Safety
+        ///
+        /// Calls into `game.exe`: its `init()` must have succeeded, and the arguments must be valid for this function.
+        ///
+        /// # Panics
+        ///
+        /// If `game.exe`'s `init()` has not succeeded.
+        pub unsafe fn Spawn(
+            actor: *mut super::actors::Actor,
+            Rank_: super::actors::Rank,
+            RVA_: u32,
+        ) -> *mut super::actors::Player {
+            // SAFETY: forwarded to the caller.
+            unsafe { Spawn::ptr()(actor, Rank_, RVA_) }
+        }
+
+        /// Address, signature and hook of `actors::Spawn`.
+        pub mod Spawn {
+            /// The function's address relative to `game.exe`'s base.
+            pub const RVA: u32 = 0x16200;
+            /// The function's type.
+            pub type Signature = unsafe extern "system" fn(
+                actor: *mut super::super::actors::Actor,
+                Rank_: super::super::actors::Rank,
+                RVA_: u32,
+            ) -> *mut super::super::actors::Player;
+            /// The function's address in this process.
+            ///
+            /// # Panics
+            ///
+            /// If `game.exe`'s `init()` has not succeeded.
+            pub fn ptr() -> Signature {
+                // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
+                unsafe {
+                    ::core::mem::transmute::<
+                        usize,
+                        Signature,
+                    >(super::super::MODULE.address(RVA))
+                }
+            }
+
+            /// The original `actors::Spawn`, handed to a hook's `detour` with the arguments of the call being hooked. It can only be used during that call.
+            pub struct Original<'call>(
+                Signature,
+                (*mut super::super::actors::Actor, super::super::actors::Rank, u32),
+                ::core::marker::PhantomData<&'call ()>,
+            );
+
+            impl Original<'_> {
+                /// Calls the original function with the arguments the target passed to the hooked call.
+                pub fn forward(self) -> *mut super::super::actors::Player {
+                    let (actor, Rank_, RVA_) = self.1;
+                    // SAFETY: these are the arguments the target passed to the hooked call, so this is the call it was making; `init`'s caller promised the function has type `Signature`.
+                    unsafe { (self.0)(actor, Rank_, RVA_) }
+                }
+
+                /// Calls the original function with other arguments.
+                ///
+                /// # Safety
+                ///
+                /// The arguments must be valid for this function.
+                pub unsafe fn call(
+                    self,
+                    actor: *mut super::super::actors::Actor,
+                    Rank_: super::super::actors::Rank,
+                    RVA_: u32,
+                ) -> *mut super::super::actors::Player {
+                    // SAFETY: forwarded to the caller.
+                    unsafe { (self.0)(actor, Rank_, RVA_) }
+                }
+            }
+
+            static SLOT: ::imping_runtime::__private::Slot<
+                dyn for<'call> Fn(
+                    Original<'call>,
+                    *mut super::super::actors::Actor,
+                    super::super::actors::Rank,
+                    u32,
+                ) -> *mut super::super::actors::Player + Send + Sync,
+                Signature,
+            > = ::imping_runtime::__private::Slot::new();
+            unsafe extern "system" fn thunk(
+                actor: *mut super::super::actors::Actor,
+                Rank_: super::super::actors::Rank,
+                RVA_: u32,
+            ) -> *mut super::super::actors::Player {
+                let (detour, original) = SLOT.get();
+                detour(
+                    Original(
+                        original,
+                        (actor, Rank_, RVA_),
+                        ::core::marker::PhantomData,
+                    ),
+                    actor,
+                    Rank_,
+                    RVA_,
+                )
+            }
+
+            /// Hooks `actors::Spawn`: once enabled, every call runs `detour`, which receives an `Original` first, then the arguments. `original.forward()` calls the original function with the arguments the target passed; `original.call(..)` calls it with other ones.
+            ///
+            /// The hook is returned disabled; enable it with `Hook::enable`. Dropping the guard disables it, after which the function can be hooked again. A panic inside `detour` aborts the process.
+            ///
+            /// # Errors
+            ///
+            /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, or if patching fails.
+            pub fn hook(
+                detour: impl for<'call> Fn(
+                    Original<'call>,
+                    *mut super::super::actors::Actor,
+                    super::super::actors::Rank,
+                    u32,
+                ) -> *mut super::super::actors::Player + Send + Sync + 'static,
+            ) -> ::imping_runtime::Result<::imping_runtime::Hook<Signature>> {
+                // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
+                unsafe {
+                    ::imping_runtime::__private::install(
+                        &super::super::MODULE,
+                        RVA,
+                        &[],
+                        &SLOT,
+                        ::std::boxed::Box::new(detour),
+                        thunk,
+                    )
+                }
+            }
+        }
+
+        /// `actors::sLocalPlayer` at `game.exe+0x3a1500`.
+        pub static sLocalPlayer: ::imping_runtime::Global<*mut super::actors::Player> = ::imping_runtime::Global::new(
+            &super::MODULE,
+            0x3a1500,
+        );
     }
 }
