@@ -217,6 +217,7 @@ name = "imping-hook"
 version = "0.1.0"
 dependencies = [
  "detour",
+ "iced-x86",
  "region",
  "windows-sys",
 ]
