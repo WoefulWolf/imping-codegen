@@ -66,6 +66,8 @@ pub mod game32 {
         ::core::assert!(::core::mem::offset_of!(Node, value) == 0x8);
     };
 
+    // SAFETY: every field is plain data, so every bit pattern is a valid value.
+    unsafe impl ::imping_runtime::Plain for Node {}
     /// Typedef `VisitFn`.
     pub type VisitFn = ::core::option::Option<
         unsafe extern "thiscall" fn(*mut Node, f32) -> u32,

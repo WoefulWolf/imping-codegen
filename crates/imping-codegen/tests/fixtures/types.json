@@ -173,7 +173,8 @@
           "parameters": [
             { "name": "this", "type": 16, "storage": { "kind": "register", "value": "rcx" } },
             { "name": "amount", "type": 5, "storage": { "kind": "register", "value": "edx" } }
-          ] },
+          ],
+          "tags": ["imping-safe"] },
         { "name": "Entity", "namespace": ["Entity"], "rva": "0x15000",
           "calling_convention": "win64", "return_type": 16,
           "parameters": [
@@ -205,7 +206,20 @@
             { "name": "original", "type": 6, "storage": { "kind": "register", "value": "rdx" } },
             { "name": "detour", "type": 1, "storage": { "kind": "register", "value": "r8" } },
             { "name": "type", "type": 34, "storage": { "kind": "register", "value": "r9" } }
-          ] },
+          ],
+          "tags": ["imping-safe"] },
+        { "name": "Release", "namespace": ["util"], "rva": "0x15f00",
+          "calling_convention": "win64", "return_type": 0,
+          "parameters": [
+            { "name": "memory", "type": 14, "storage": { "kind": "register", "value": "rcx" } }
+          ],
+          "tags": ["imping-safe"] },
+        { "name": "Store", "namespace": ["util"], "rva": "0x15f80",
+          "calling_convention": "win64", "return_type": 0,
+          "parameters": [
+            { "name": "holder", "type": 32, "storage": { "kind": "register", "value": "rcx" } }
+          ],
+          "tags": ["imping-safe"] },
         { "name": "Tick", "namespace": ["Game", "World"], "rva": "0x16000",
           "calling_convention": "win64", "return_type": 0,
           "parameters": [ { "type": 0, "storage": { "kind": "stack", "offset": 0 } } ] },
@@ -213,19 +227,22 @@
           "calling_convention": "win64", "return_type": 0,
           "parameters": [
             { "name": "title", "type": 52, "storage": { "kind": "register", "value": "rcx" } }
-          ] },
+          ],
+          "tags": ["imping-safe"] },
         { "name": "Rename", "namespace": ["ui"], "rva": "0x16300",
           "calling_convention": "win64", "return_type": 59,
           "parameters": [
             { "name": "named", "type": 57, "storage": { "kind": "register", "value": "rcx" } },
             { "name": "tag", "type": 53, "storage": { "kind": "register", "value": "rdx" } },
             { "name": "data", "type": 56, "storage": { "kind": "register", "value": "r8" } }
-          ] },
+          ],
+          "tags": ["imping-safe"] },
         { "name": "Normalize", "namespace": ["math"], "rva": "0x16100",
           "calling_convention": "win64", "return_type": 10,
           "parameters": [
             { "name": "v", "type": 10, "storage": { "kind": "register", "value": "rcx" } }
-          ] }
+          ],
+          "tags": ["imping-safe"] }
       ],
       "globals": [
         { "name": "gGravity", "rva": "0x3a1200", "type": 8 },

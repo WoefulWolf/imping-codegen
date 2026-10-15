@@ -13,8 +13,16 @@
 //!   zero-sized markers.
 //! - Functions become an `unsafe fn` plus a module of the same name with the
 //!   function's `RVA`, `Signature`, `ptr()` and `hook()`, inside one module per
-//!   namespace.
-//! - Globals become `imping_runtime::Global` statics.
+//!   namespace. A hook's closure receives the function's `Original` first:
+//!   `original.forward()` safely makes the call the target was making.
+//! - Functions with the function tag `imping-safe` get a safe `fn` instead,
+//!   whose pointer parameters are references, unless a parameter has no safe
+//!   form (a [`Warning`] says so). The tag means: with valid arguments the
+//!   function is always fine to call, and it keeps none of its pointer
+//!   arguments after returning.
+//! - Globals become `imping_runtime::Global` statics. Structs, unions and enums
+//!   whose every bit pattern is valid implement `imping_runtime::Plain`, which
+//!   makes their globals safe to read and write.
 //!
 //! # Example
 //!

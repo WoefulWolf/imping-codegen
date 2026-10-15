@@ -180,6 +180,32 @@ impl<'a> TypeTable<'a> {
         }
     }
 
+    /// Whether a value of this type can't hand the target a data pointer: the
+    /// IR describes no pointer in it at any depth. Function pointers are
+    /// allowed, since safe Rust can only make valid ones. Opaque types count
+    /// as possibly containing pointers.
+    pub(crate) fn is_pointer_free(&self, id: TypeId) -> bool {
+        self.pointer_free_within(id, MAX_TYPEDEF_DEPTH)
+    }
+
+    fn pointer_free_within(&self, id: TypeId, depth: usize) -> bool {
+        let Some(depth) = depth.checked_sub(1) else {
+            return false;
+        };
+        match &self.get(id).kind {
+            TypeKind::Primitive { .. } | TypeKind::Enum { .. } | TypeKind::Function { .. } => true,
+            TypeKind::Pointer { pointee, .. } => self
+                .peel(*pointee)
+                .is_some_and(|def| matches!(def.kind, TypeKind::Function { .. })),
+            TypeKind::Array { element, .. } => self.pointer_free_within(*element, depth),
+            TypeKind::Struct { fields, .. } | TypeKind::Union { fields, .. } => fields
+                .iter()
+                .all(|field| self.pointer_free_within(field.type_id, depth)),
+            TypeKind::Typedef { target } => self.pointer_free_within(*target, depth),
+            TypeKind::Opaque { .. } => false,
+        }
+    }
+
     /// The path to a type item from `depth` levels below the module root.
     pub(crate) fn path(&self, id: TypeId, depth: usize) -> TokenStream {
         let name = names::ident(self.name(id));

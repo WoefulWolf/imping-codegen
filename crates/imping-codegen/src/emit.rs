@@ -162,7 +162,30 @@ fn type_item(
             "opaque, size unknown; use only behind pointers.",
         ),
     };
-    Some(item)
+    let plain = plain_impl(table, layouts, def);
+    Some(quote! { #item #plain })
+}
+
+/// `unsafe impl Plain` for a struct, union, enum or opaque type whose every
+/// bit pattern is a valid value, so `Global::read` and `write` are safe for it.
+fn plain_impl(table: &TypeTable<'_>, layouts: &Layouts, def: &TypeDef) -> Option<TokenStream> {
+    let reason = match &def.kind {
+        TypeKind::Enum { .. } => " SAFETY: a transparent wrapper of an integer.",
+        TypeKind::Opaque { size: Some(_) } => " SAFETY: only bytes.",
+        TypeKind::Struct { .. } | TypeKind::Union { .. } => match layouts.get(def.id) {
+            Plan::Opaque { .. } => " SAFETY: only bytes.",
+            _ => " SAFETY: every field is plain data, so every bit pattern is a valid value.",
+        },
+        _ => return None,
+    };
+    if !layouts.is_plain(table, def.id) {
+        return None;
+    }
+    let name = ident(table.name(def.id));
+    Some(quote! {
+        #[comment = #reason]
+        unsafe impl ::imping_runtime::Plain for #name {}
+    })
 }
 
 fn warn_opaque(table: &TypeTable<'_>, def: &TypeDef, reason: &str, warnings: &mut Vec<Warning>) {

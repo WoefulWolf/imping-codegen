@@ -148,6 +148,50 @@ impl Layouts {
             .get(&id.0)
             .unwrap_or_else(|| panic!("type id {} has no layout plan", id.0))
     }
+
+    /// Whether the Rust type generated for `id` is plain data: every bit
+    /// pattern of it is a valid value, so it implements the runtime's `Plain`.
+    /// `bool`, `void`, function pointers and unsized opaque types are not.
+    pub(crate) fn is_plain(&self, table: &TypeTable<'_>, id: TypeId) -> bool {
+        self.plain_within(table, id, 64)
+    }
+
+    fn plain_within(&self, table: &TypeTable<'_>, id: TypeId, depth: usize) -> bool {
+        let Some(depth) = depth.checked_sub(1) else {
+            return false;
+        };
+        let def = table.get(id);
+        match &def.kind {
+            TypeKind::Primitive { primitive } => {
+                !matches!(primitive, Primitive::Void | Primitive::Bool)
+            }
+            TypeKind::Pointer { pointee, .. } => !table
+                .peel(*pointee)
+                .is_some_and(|pointee| matches!(pointee.kind, TypeKind::Function { .. })),
+            TypeKind::Array { element, .. } => self.plain_within(table, *element, depth),
+            TypeKind::Struct { fields, .. } | TypeKind::Union { fields, .. } => {
+                match self.get(id) {
+                    Plan::Opaque { .. } => true,
+                    Plan::Struct(plan) => plan.members.iter().all(|member| match member {
+                        Member::Field { index, .. } => {
+                            self.plain_within(table, fields[*index].type_id, depth)
+                        }
+                        Member::Padding { .. } | Member::Bits { .. } => true,
+                    }),
+                    Plan::Union(plan) => plan
+                        .fields
+                        .iter()
+                        .all(|&index| self.plain_within(table, fields[index].type_id, depth)),
+                }
+            }
+            TypeKind::Enum { .. } => true,
+            TypeKind::Function { .. } => false,
+            TypeKind::Typedef { target } => {
+                table.peel(id).is_some() && self.plain_within(table, *target, depth)
+            }
+            TypeKind::Opaque { size } => size.is_some(),
+        }
+    }
 }
 
 struct Planner<'t, 'a> {

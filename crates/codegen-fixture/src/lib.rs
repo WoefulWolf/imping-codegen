@@ -75,15 +75,17 @@ mod functions {
 
     #[test]
     fn hooks_fail_before_init() {
-        let error = game::entity::Update::hook(|original, this, dt| {
-            // SAFETY: Never runs; the hook is not installed.
-            unsafe { original(this, dt) }
-        })
-        .unwrap_err();
+        let error = game::entity::Update::hook(|original, _, _| original.forward()).unwrap_err();
         assert!(matches!(
             error,
             Error::NotInitialized { module: "game.exe" }
         ));
+        let error = game::entity::Update::hook(|original, this, dt| {
+            // SAFETY: Never runs; the hook is not installed.
+            unsafe { original.call(this, dt * 0.5) }
+        })
+        .unwrap_err();
+        assert!(matches!(error, Error::NotInitialized { .. }));
     }
 
     #[test]
@@ -94,15 +96,50 @@ mod functions {
 
     #[test]
     #[should_panic(expected = "is not initialized")]
-    fn calls_panic_before_init() {
+    fn unsafe_calls_panic_before_init() {
         // SAFETY: It panics before calling anything, since `init` hasn't run.
-        unsafe { game::math::Normalize(game::Vector3::default()) };
+        unsafe { game::GetPlayer() };
+    }
+
+    #[test]
+    #[should_panic(expected = "is not initialized")]
+    fn safe_calls_panic_before_init() {
+        game::math::Normalize(game::Vector3::default());
     }
 
     #[test]
     #[should_panic(expected = "is not initialized")]
     fn globals_panic_before_init() {
-        game::gGravity.ptr();
+        game::gGravity.read();
+    }
+
+    #[test]
+    fn functions_tagged_imping_safe_have_safe_wrappers() {
+        let _: fn(&mut game::Entity, i32) = game::entity::Damage;
+        let _: fn(game::Vector3) -> game::Vector3 = game::math::Normalize;
+        let _: fn(&imping_runtime::WString) = game::ui::SetTitle;
+        let _: fn(&mut game::Named, &core::ffi::CStr, &mut u8) -> imping_runtime::CStrPtr =
+            game::ui::Rename;
+        // Tagged, but a parameter has no safe form: still `unsafe`.
+        let _: unsafe fn(*mut core::ffi::c_void) = game::util::Release;
+        let _: unsafe fn(game::Holder) = game::util::Store;
+        // Untagged overload.
+        let _: unsafe fn(*mut game::Entity, f32) = game::entity::Damage_2;
+    }
+
+    #[test]
+    fn plain_types_and_globals() {
+        fn assert_plain<T: imping_runtime::Plain>() {}
+        assert_plain::<game::Vector3>();
+        assert_plain::<game::EntityKind>();
+        assert_plain::<game::Named>();
+        assert_plain::<game::Value>();
+        assert_plain::<game::Broken>();
+        assert_plain::<game::Holder>();
+        let _: fn(&imping_runtime::Global<f32>) -> f32 = imping_runtime::Global::read;
+        let _: fn(&imping_runtime::Global<*mut game::Entity>, *mut game::Entity) =
+            imping_runtime::Global::write;
+        let _ = &game::gPlayer;
     }
 
     #[test]

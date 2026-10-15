@@ -115,6 +115,16 @@ pub enum Warning {
         /// Why it can't be hooked.
         reason: String,
     },
+    /// A function is tagged `imping-safe`, but a parameter has no safe form,
+    /// so its call wrapper stays `unsafe`.
+    SafeCallUnavailable {
+        /// The IR module the function is in.
+        module: String,
+        /// The function's name, including its namespace.
+        function: String,
+        /// Why the call can't be safe.
+        reason: String,
+    },
     /// An enum constant's value fits neither the signed nor the unsigned
     /// range of the enum's underlying type, so it was truncated to fit.
     ///
@@ -163,6 +173,15 @@ impl fmt::Display for Warning {
             } => write!(
                 f,
                 "`{module}` function `{function}` can be called but not hooked: {reason}"
+            ),
+            Warning::SafeCallUnavailable {
+                module,
+                function,
+                reason,
+            } => write!(
+                f,
+                "`{module}` function `{function}` is tagged `imping-safe` but its call stays \
+                 unsafe: {reason}"
             ),
             Warning::EnumValueTruncated {
                 module,

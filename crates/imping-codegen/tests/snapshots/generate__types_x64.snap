@@ -67,6 +67,8 @@ pub mod game {
         ::core::assert!(::core::mem::offset_of!(Vector3, z) == 0x8);
     };
 
+    // SAFETY: every field is plain data, so every bit pattern is a valid value.
+    unsafe impl ::imping_runtime::Plain for Vector3 {}
     /// `EntityKind`: enum over `u32`.
     #[repr(transparent)]
     #[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -97,6 +99,8 @@ pub mod game {
         }
     }
 
+    // SAFETY: a transparent wrapper of an integer.
+    unsafe impl ::imping_runtime::Plain for EntityKind {}
     /// `Entity`: 64 bytes, align 8.
     #[repr(C)]
     #[derive(Clone, Copy, Debug)]
@@ -215,6 +219,8 @@ pub mod game {
         ::core::assert!(::core::mem::offset_of!(PackedHeader, flags) == 0x5);
     };
 
+    // SAFETY: every field is plain data, so every bit pattern is a valid value.
+    unsafe impl ::imping_runtime::Plain for PackedHeader {}
     /// `Aligned16`: 16 bytes, align 16.
     #[repr(C, align(16))]
     #[derive(Clone, Copy, Debug)]
@@ -239,6 +245,8 @@ pub mod game {
         ::core::assert!(::core::mem::offset_of!(Aligned16, value) == 0x0);
     };
 
+    // SAFETY: every field is plain data, so every bit pattern is a valid value.
+    unsafe impl ::imping_runtime::Plain for Aligned16 {}
     /// `Value`: union, 8 bytes, align 8.
     #[repr(C)]
     #[derive(Clone, Copy)]
@@ -270,6 +278,8 @@ pub mod game {
         ::core::assert!(::core::mem::align_of::<Value>() == 0x8);
     };
 
+    // SAFETY: every field is plain data, so every bit pattern is a valid value.
+    unsafe impl ::imping_runtime::Plain for Value {}
     /// `Small`: union, 4 bytes, align 4.
     #[repr(C, align(4))]
     #[derive(Clone, Copy)]
@@ -297,6 +307,8 @@ pub mod game {
         ::core::assert!(::core::mem::align_of::<Small>() == 0x4);
     };
 
+    // SAFETY: every field is plain data, so every bit pattern is a valid value.
+    unsafe impl ::imping_runtime::Plain for Small {}
     /// `SmallSigned`: enum over `i8`.
     #[repr(transparent)]
     #[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -325,6 +337,8 @@ pub mod game {
         }
     }
 
+    // SAFETY: a transparent wrapper of an integer.
+    unsafe impl ::imping_runtime::Plain for SmallSigned {}
     /// Typedef `DWORD`.
     pub type DWORD = u32;
 
@@ -360,6 +374,8 @@ pub mod game {
         ::core::assert!(::core::mem::align_of::<Blob>() == 0x1);
     };
 
+    // SAFETY: only bytes.
+    unsafe impl ::imping_runtime::Plain for Blob {}
     /// `Broken`: 8 bytes, align 4. Its layout can't be represented (field `b` overlaps `a`), so it is opaque bytes.
     #[repr(C, align(4))]
     #[derive(Clone, Copy, Debug)]
@@ -381,6 +397,8 @@ pub mod game {
         ::core::assert!(::core::mem::align_of::<Broken>() == 0x4);
     };
 
+    // SAFETY: only bytes.
+    unsafe impl ::imping_runtime::Plain for Broken {}
     /// `Vector3`: 8 bytes, align 4.
     #[repr(C)]
     #[derive(Clone, Copy, Debug)]
@@ -406,6 +424,8 @@ pub mod game {
         ::core::assert!(::core::mem::offset_of!(Vector3_30, y) == 0x4);
     };
 
+    // SAFETY: every field is plain data, so every bit pattern is a valid value.
+    unsafe impl ::imping_runtime::Plain for Vector3_30 {}
     /// `Keywords`: 12 bytes, align 4.
     #[repr(C)]
     #[derive(Clone, Copy, Debug)]
@@ -439,6 +459,8 @@ pub mod game {
         ::core::assert!(::core::mem::offset_of!(Keywords, _8bit) == 0x9);
     };
 
+    // SAFETY: every field is plain data, so every bit pattern is a valid value.
+    unsafe impl ::imping_runtime::Plain for Keywords {}
     /// `Holder`: 24 bytes, align 8.
     #[repr(C)]
     #[derive(Clone, Copy, Debug)]
@@ -464,6 +486,8 @@ pub mod game {
         ::core::assert!(::core::mem::offset_of!(Holder, blob) == 0x8);
     };
 
+    // SAFETY: every field is plain data, so every bit pattern is a valid value.
+    unsafe impl ::imping_runtime::Plain for Holder {}
     /// `Matrix`: 64 bytes, align 4.
     #[repr(C)]
     #[derive(Clone, Copy, Debug)]
@@ -486,6 +510,8 @@ pub mod game {
         ::core::assert!(::core::mem::offset_of!(Matrix, rows) == 0x0);
     };
 
+    // SAFETY: every field is plain data, so every bit pattern is a valid value.
+    unsafe impl ::imping_runtime::Plain for Matrix {}
     /// `UsesBroken`: 16 bytes, align 4.
     #[repr(C)]
     #[derive(Clone, Copy, Debug)]
@@ -513,6 +539,8 @@ pub mod game {
         ::core::assert!(::core::mem::offset_of!(UsesBroken, tail) == 0x8);
     };
 
+    // SAFETY: every field is plain data, so every bit pattern is a valid value.
+    unsafe impl ::imping_runtime::Plain for UsesBroken {}
     /// `Unsized`: 8 bytes, align 8. Its layout can't be represented (field `r` has no known size), so it is opaque bytes.
     #[repr(C, align(8))]
     #[derive(Clone, Copy, Debug)]
@@ -534,6 +562,8 @@ pub mod game {
         ::core::assert!(::core::mem::align_of::<Unsized>() == 0x8);
     };
 
+    // SAFETY: only bytes.
+    unsafe impl ::imping_runtime::Plain for Unsized {}
     /// `init`: 4 bytes, align 4.
     #[repr(C)]
     #[derive(Clone, Copy, Debug)]
@@ -556,6 +586,8 @@ pub mod game {
         ::core::assert!(::core::mem::offset_of!(init_39, v) == 0x0);
     };
 
+    // SAFETY: every field is plain data, so every bit pattern is a valid value.
+    unsafe impl ::imping_runtime::Plain for init_39 {}
     /// Typedef `LogFn`.
     pub type LogFn = ::core::option::Option<
         unsafe extern "C" fn(::imping_runtime::CStrPtr, ...) -> i32,
@@ -614,6 +646,8 @@ pub mod game {
         ::core::assert!(::core::mem::offset_of!(Wide, count) == 0x10);
     };
 
+    // SAFETY: every field is plain data, so every bit pattern is a valid value.
+    unsafe impl ::imping_runtime::Plain for Wide {}
     /// Typedef `TickFn`.
     pub type TickFn = ::core::option::Option<unsafe extern "system" fn()>;
 
@@ -659,6 +693,8 @@ pub mod game {
         ::core::assert!(::core::mem::offset_of!(Named, title) == 0x10);
     };
 
+    // SAFETY: every field is plain data, so every bit pattern is a valid value.
+    unsafe impl ::imping_runtime::Plain for Named {}
     /// Typedef `CHAR`.
     pub type CHAR = i8;
 
@@ -698,16 +734,42 @@ pub mod game {
             }
         }
 
+        /// The original `GetPlayer`, handed to a hook's `detour` with the arguments of the call being hooked. It can only be used during that call.
+        pub struct Original<'call>(
+            Signature,
+            (),
+            ::core::marker::PhantomData<&'call ()>,
+        );
+
+        impl Original<'_> {
+            /// Calls the original function with the arguments the target passed to the hooked call.
+            pub fn forward(self) -> *mut super::Entity {
+                let () = self.1;
+                // SAFETY: these are the arguments the target passed to the hooked call, so this is the call it was making; `init`'s caller promised the function has type `Signature`.
+                unsafe { (self.0)() }
+            }
+
+            /// Calls the original function with other arguments.
+            ///
+            /// # Safety
+            ///
+            /// The arguments must be valid for this function.
+            pub unsafe fn call(self) -> *mut super::Entity {
+                // SAFETY: forwarded to the caller.
+                unsafe { (self.0)() }
+            }
+        }
+
         static SLOT: ::imping_runtime::__private::Slot<
-            dyn Fn(Signature) -> *mut super::Entity + Send + Sync,
+            dyn for<'call> Fn(Original<'call>) -> *mut super::Entity + Send + Sync,
             Signature,
         > = ::imping_runtime::__private::Slot::new();
         unsafe extern "system" fn thunk() -> *mut super::Entity {
             let (detour, original) = SLOT.get();
-            detour(original)
+            detour(Original(original, (), ::core::marker::PhantomData))
         }
 
-        /// Hooks `GetPlayer`: once enabled, every call runs `detour`, which receives the original function first, then the arguments.
+        /// Hooks `GetPlayer`: once enabled, every call runs `detour`, which receives an `Original` first, then the arguments. `original.forward()` calls the original function with the arguments the target passed; `original.call(..)` calls it with other ones.
         ///
         /// The hook is returned disabled; enable it with `Hook::enable`. Dropping the guard disables it, after which the function can be hooked again. A panic inside `detour` aborts the process.
         ///
@@ -715,7 +777,9 @@ pub mod game {
         ///
         /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, or if patching fails.
         pub fn hook(
-            detour: impl Fn(Signature) -> *mut super::Entity + Send + Sync + 'static,
+            detour: impl for<'call> Fn(
+                Original<'call>,
+            ) -> *mut super::Entity + Send + Sync + 'static,
         ) -> ::imping_runtime::Result<::imping_runtime::Hook<Signature>> {
             // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
             unsafe {
@@ -764,16 +828,42 @@ pub mod game {
             }
         }
 
+        /// The original `init`, handed to a hook's `detour` with the arguments of the call being hooked. It can only be used during that call.
+        pub struct Original<'call>(
+            Signature,
+            (),
+            ::core::marker::PhantomData<&'call ()>,
+        );
+
+        impl Original<'_> {
+            /// Calls the original function with the arguments the target passed to the hooked call.
+            pub fn forward(self) {
+                let () = self.1;
+                // SAFETY: these are the arguments the target passed to the hooked call, so this is the call it was making; `init`'s caller promised the function has type `Signature`.
+                unsafe { (self.0)() }
+            }
+
+            /// Calls the original function with other arguments.
+            ///
+            /// # Safety
+            ///
+            /// The arguments must be valid for this function.
+            pub unsafe fn call(self) {
+                // SAFETY: forwarded to the caller.
+                unsafe { (self.0)() }
+            }
+        }
+
         static SLOT: ::imping_runtime::__private::Slot<
-            dyn Fn(Signature) + Send + Sync,
+            dyn for<'call> Fn(Original<'call>) + Send + Sync,
             Signature,
         > = ::imping_runtime::__private::Slot::new();
         unsafe extern "system" fn thunk() {
             let (detour, original) = SLOT.get();
-            detour(original)
+            detour(Original(original, (), ::core::marker::PhantomData))
         }
 
-        /// Hooks `init`: once enabled, every call runs `detour`, which receives the original function first, then the arguments.
+        /// Hooks `init`: once enabled, every call runs `detour`, which receives an `Original` first, then the arguments. `original.forward()` calls the original function with the arguments the target passed; `original.call(..)` calls it with other ones.
         ///
         /// The hook is returned disabled; enable it with `Hook::enable`. Dropping the guard disables it, after which the function can be hooked again. A panic inside `detour` aborts the process.
         ///
@@ -781,7 +871,7 @@ pub mod game {
         ///
         /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, or if patching fails.
         pub fn hook(
-            detour: impl Fn(Signature) + Send + Sync + 'static,
+            detour: impl for<'call> Fn(Original<'call>) + Send + Sync + 'static,
         ) -> ::imping_runtime::Result<::imping_runtime::Hook<Signature>> {
             // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
             unsafe {
@@ -852,16 +942,50 @@ pub mod game {
                 }
             }
 
+            /// The original `Entity::Update`, handed to a hook's `detour` with the arguments of the call being hooked. It can only be used during that call.
+            pub struct Original<'call>(
+                Signature,
+                (*mut super::super::Entity, f32),
+                ::core::marker::PhantomData<&'call ()>,
+            );
+
+            impl Original<'_> {
+                /// Calls the original function with the arguments the target passed to the hooked call.
+                pub fn forward(self) {
+                    let (this, dt) = self.1;
+                    // SAFETY: these are the arguments the target passed to the hooked call, so this is the call it was making; `init`'s caller promised the function has type `Signature`.
+                    unsafe { (self.0)(this, dt) }
+                }
+
+                /// Calls the original function with other arguments.
+                ///
+                /// # Safety
+                ///
+                /// The arguments must be valid for this function.
+                pub unsafe fn call(self, this: *mut super::super::Entity, dt: f32) {
+                    // SAFETY: forwarded to the caller.
+                    unsafe { (self.0)(this, dt) }
+                }
+            }
+
             static SLOT: ::imping_runtime::__private::Slot<
-                dyn Fn(Signature, *mut super::super::Entity, f32) + Send + Sync,
+                dyn for<'call> Fn(
+                    Original<'call>,
+                    *mut super::super::Entity,
+                    f32,
+                ) + Send + Sync,
                 Signature,
             > = ::imping_runtime::__private::Slot::new();
             unsafe extern "system" fn thunk(this: *mut super::super::Entity, dt: f32) {
                 let (detour, original) = SLOT.get();
-                detour(original, this, dt)
+                detour(
+                    Original(original, (this, dt), ::core::marker::PhantomData),
+                    this,
+                    dt,
+                )
             }
 
-            /// Hooks `Entity::Update`: once enabled, every call runs `detour`, which receives the original function first, then the arguments.
+            /// Hooks `Entity::Update`: once enabled, every call runs `detour`, which receives an `Original` first, then the arguments. `original.forward()` calls the original function with the arguments the target passed; `original.call(..)` calls it with other ones.
             ///
             /// The hook is returned disabled; enable it with `Hook::enable`. Dropping the guard disables it, after which the function can be hooked again. A panic inside `detour` aborts the process.
             ///
@@ -869,8 +993,8 @@ pub mod game {
             ///
             /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, if its first bytes differ from `VERIFICATION`, or if patching fails.
             pub fn hook(
-                detour: impl Fn(
-                    Signature,
+                detour: impl for<'call> Fn(
+                    Original<'call>,
                     *mut super::super::Entity,
                     f32,
                 ) + Send + Sync + 'static,
@@ -928,8 +1052,38 @@ pub mod game {
                 }
             }
 
+            /// The original `Entity::Damage`, handed to a hook's `detour` with the arguments of the call being hooked. It can only be used during that call.
+            pub struct Original<'call>(
+                Signature,
+                (*mut super::super::Entity, f32),
+                ::core::marker::PhantomData<&'call ()>,
+            );
+
+            impl Original<'_> {
+                /// Calls the original function with the arguments the target passed to the hooked call.
+                pub fn forward(self) {
+                    let (this, amount) = self.1;
+                    // SAFETY: these are the arguments the target passed to the hooked call, so this is the call it was making; `init`'s caller promised the function has type `Signature`.
+                    unsafe { (self.0)(this, amount) }
+                }
+
+                /// Calls the original function with other arguments.
+                ///
+                /// # Safety
+                ///
+                /// The arguments must be valid for this function.
+                pub unsafe fn call(self, this: *mut super::super::Entity, amount: f32) {
+                    // SAFETY: forwarded to the caller.
+                    unsafe { (self.0)(this, amount) }
+                }
+            }
+
             static SLOT: ::imping_runtime::__private::Slot<
-                dyn Fn(Signature, *mut super::super::Entity, f32) + Send + Sync,
+                dyn for<'call> Fn(
+                    Original<'call>,
+                    *mut super::super::Entity,
+                    f32,
+                ) + Send + Sync,
                 Signature,
             > = ::imping_runtime::__private::Slot::new();
             unsafe extern "system" fn thunk(
@@ -937,10 +1091,14 @@ pub mod game {
                 amount: f32,
             ) {
                 let (detour, original) = SLOT.get();
-                detour(original, this, amount)
+                detour(
+                    Original(original, (this, amount), ::core::marker::PhantomData),
+                    this,
+                    amount,
+                )
             }
 
-            /// Hooks `Entity::Damage`: once enabled, every call runs `detour`, which receives the original function first, then the arguments.
+            /// Hooks `Entity::Damage`: once enabled, every call runs `detour`, which receives an `Original` first, then the arguments. `original.forward()` calls the original function with the arguments the target passed; `original.call(..)` calls it with other ones.
             ///
             /// The hook is returned disabled; enable it with `Hook::enable`. Dropping the guard disables it, after which the function can be hooked again. A panic inside `detour` aborts the process.
             ///
@@ -948,8 +1106,8 @@ pub mod game {
             ///
             /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, or if patching fails.
             pub fn hook(
-                detour: impl Fn(
-                    Signature,
+                detour: impl for<'call> Fn(
+                    Original<'call>,
                     *mut super::super::Entity,
                     f32,
                 ) + Send + Sync + 'static,
@@ -968,18 +1126,16 @@ pub mod game {
             }
         }
 
-        /// `Entity::Damage` at `game.exe+0x15300`.
+        /// `Entity::Damage` at `game.exe+0x15300`. Tags: `imping-safe`.
         ///
-        /// # Safety
-        ///
-        /// Calls into `game.exe`: its `init()` must have succeeded, and the arguments must be valid for this function.
+        /// Tagged `imping-safe`, so it is safe to call: valid arguments are all it needs, and its pointer parameters are references.
         ///
         /// # Panics
         ///
         /// If `game.exe`'s `init()` has not succeeded.
-        pub unsafe fn Damage(this: *mut super::Entity, amount: i32) {
-            // SAFETY: forwarded to the caller.
-            unsafe { Damage::ptr()(this, amount) }
+        pub fn Damage(this: &mut super::Entity, amount: i32) {
+            // SAFETY: the function is tagged `imping-safe` in the IR, which `init`'s caller vouched for: it needs only valid arguments and keeps none of the pointers, and the parameter types guarantee valid arguments.
+            unsafe { Damage::ptr()(::core::ptr::from_mut(this), amount) }
         }
 
         /// Address, signature and hook of `Entity::Damage`.
@@ -1007,8 +1163,38 @@ pub mod game {
                 }
             }
 
+            /// The original `Entity::Damage`, handed to a hook's `detour` with the arguments of the call being hooked. It can only be used during that call.
+            pub struct Original<'call>(
+                Signature,
+                (*mut super::super::Entity, i32),
+                ::core::marker::PhantomData<&'call ()>,
+            );
+
+            impl Original<'_> {
+                /// Calls the original function with the arguments the target passed to the hooked call.
+                pub fn forward(self) {
+                    let (this, amount) = self.1;
+                    // SAFETY: these are the arguments the target passed to the hooked call, so this is the call it was making; `init`'s caller promised the function has type `Signature`.
+                    unsafe { (self.0)(this, amount) }
+                }
+
+                /// Calls the original function with other arguments.
+                ///
+                /// # Safety
+                ///
+                /// The arguments must be valid for this function.
+                pub unsafe fn call(self, this: *mut super::super::Entity, amount: i32) {
+                    // SAFETY: forwarded to the caller.
+                    unsafe { (self.0)(this, amount) }
+                }
+            }
+
             static SLOT: ::imping_runtime::__private::Slot<
-                dyn Fn(Signature, *mut super::super::Entity, i32) + Send + Sync,
+                dyn for<'call> Fn(
+                    Original<'call>,
+                    *mut super::super::Entity,
+                    i32,
+                ) + Send + Sync,
                 Signature,
             > = ::imping_runtime::__private::Slot::new();
             unsafe extern "system" fn thunk(
@@ -1016,10 +1202,14 @@ pub mod game {
                 amount: i32,
             ) {
                 let (detour, original) = SLOT.get();
-                detour(original, this, amount)
+                detour(
+                    Original(original, (this, amount), ::core::marker::PhantomData),
+                    this,
+                    amount,
+                )
             }
 
-            /// Hooks `Entity::Damage`: once enabled, every call runs `detour`, which receives the original function first, then the arguments.
+            /// Hooks `Entity::Damage`: once enabled, every call runs `detour`, which receives an `Original` first, then the arguments. `original.forward()` calls the original function with the arguments the target passed; `original.call(..)` calls it with other ones.
             ///
             /// The hook is returned disabled; enable it with `Hook::enable`. Dropping the guard disables it, after which the function can be hooked again. A panic inside `detour` aborts the process.
             ///
@@ -1027,8 +1217,8 @@ pub mod game {
             ///
             /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, or if patching fails.
             pub fn hook(
-                detour: impl Fn(
-                    Signature,
+                detour: impl for<'call> Fn(
+                    Original<'call>,
                     *mut super::super::Entity,
                     i32,
                 ) + Send + Sync + 'static,
@@ -1084,9 +1274,38 @@ pub mod game {
                 }
             }
 
+            /// The original `Entity::Entity`, handed to a hook's `detour` with the arguments of the call being hooked. It can only be used during that call.
+            pub struct Original<'call>(
+                Signature,
+                (*mut super::super::Entity,),
+                ::core::marker::PhantomData<&'call ()>,
+            );
+
+            impl Original<'_> {
+                /// Calls the original function with the arguments the target passed to the hooked call.
+                pub fn forward(self) -> *mut super::super::Entity {
+                    let (this,) = self.1;
+                    // SAFETY: these are the arguments the target passed to the hooked call, so this is the call it was making; `init`'s caller promised the function has type `Signature`.
+                    unsafe { (self.0)(this) }
+                }
+
+                /// Calls the original function with other arguments.
+                ///
+                /// # Safety
+                ///
+                /// The arguments must be valid for this function.
+                pub unsafe fn call(
+                    self,
+                    this: *mut super::super::Entity,
+                ) -> *mut super::super::Entity {
+                    // SAFETY: forwarded to the caller.
+                    unsafe { (self.0)(this) }
+                }
+            }
+
             static SLOT: ::imping_runtime::__private::Slot<
-                dyn Fn(
-                    Signature,
+                dyn for<'call> Fn(
+                    Original<'call>,
                     *mut super::super::Entity,
                 ) -> *mut super::super::Entity + Send + Sync,
                 Signature,
@@ -1095,10 +1314,10 @@ pub mod game {
                 this: *mut super::super::Entity,
             ) -> *mut super::super::Entity {
                 let (detour, original) = SLOT.get();
-                detour(original, this)
+                detour(Original(original, (this,), ::core::marker::PhantomData), this)
             }
 
-            /// Hooks `Entity::Entity`: once enabled, every call runs `detour`, which receives the original function first, then the arguments.
+            /// Hooks `Entity::Entity`: once enabled, every call runs `detour`, which receives an `Original` first, then the arguments. `original.forward()` calls the original function with the arguments the target passed; `original.call(..)` calls it with other ones.
             ///
             /// The hook is returned disabled; enable it with `Hook::enable`. Dropping the guard disables it, after which the function can be hooked again. A panic inside `detour` aborts the process.
             ///
@@ -1106,8 +1325,8 @@ pub mod game {
             ///
             /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, or if patching fails.
             pub fn hook(
-                detour: impl Fn(
-                    Signature,
+                detour: impl for<'call> Fn(
+                    Original<'call>,
                     *mut super::super::Entity,
                 ) -> *mut super::super::Entity + Send + Sync + 'static,
             ) -> ::imping_runtime::Result<::imping_runtime::Hook<Signature>> {
@@ -1169,7 +1388,7 @@ pub mod game {
             pub const RVA: u32 = 0x15b00;
         }
 
-        /// `util::Mixed` at `game.exe+0x15e00`.
+        /// `util::Mixed` at `game.exe+0x15e00`. Tags: `imping-safe`.
         ///
         /// # Safety
         ///
@@ -1214,8 +1433,46 @@ pub mod game {
                 }
             }
 
+            /// The original `util::Mixed`, handed to a hook's `detour` with the arguments of the call being hooked. It can only be used during that call.
+            pub struct Original<'call>(
+                Signature,
+                (u32, u32, bool, *mut f32),
+                ::core::marker::PhantomData<&'call ()>,
+            );
+
+            impl Original<'_> {
+                /// Calls the original function with the arguments the target passed to the hooked call.
+                pub fn forward(self) -> u64 {
+                    let (arg0, original_2, detour_2, r#type) = self.1;
+                    // SAFETY: these are the arguments the target passed to the hooked call, so this is the call it was making; `init`'s caller promised the function has type `Signature`.
+                    unsafe { (self.0)(arg0, original_2, detour_2, r#type) }
+                }
+
+                /// Calls the original function with other arguments.
+                ///
+                /// # Safety
+                ///
+                /// The arguments must be valid for this function.
+                pub unsafe fn call(
+                    self,
+                    arg0: u32,
+                    original_2: u32,
+                    detour_2: bool,
+                    r#type: *mut f32,
+                ) -> u64 {
+                    // SAFETY: forwarded to the caller.
+                    unsafe { (self.0)(arg0, original_2, detour_2, r#type) }
+                }
+            }
+
             static SLOT: ::imping_runtime::__private::Slot<
-                dyn Fn(Signature, u32, u32, bool, *mut f32) -> u64 + Send + Sync,
+                dyn for<'call> Fn(
+                    Original<'call>,
+                    u32,
+                    u32,
+                    bool,
+                    *mut f32,
+                ) -> u64 + Send + Sync,
                 Signature,
             > = ::imping_runtime::__private::Slot::new();
             unsafe extern "system" fn thunk(
@@ -1225,10 +1482,20 @@ pub mod game {
                 r#type: *mut f32,
             ) -> u64 {
                 let (detour, original) = SLOT.get();
-                detour(original, arg0, original_2, detour_2, r#type)
+                detour(
+                    Original(
+                        original,
+                        (arg0, original_2, detour_2, r#type),
+                        ::core::marker::PhantomData,
+                    ),
+                    arg0,
+                    original_2,
+                    detour_2,
+                    r#type,
+                )
             }
 
-            /// Hooks `util::Mixed`: once enabled, every call runs `detour`, which receives the original function first, then the arguments.
+            /// Hooks `util::Mixed`: once enabled, every call runs `detour`, which receives an `Original` first, then the arguments. `original.forward()` calls the original function with the arguments the target passed; `original.call(..)` calls it with other ones.
             ///
             /// The hook is returned disabled; enable it with `Hook::enable`. Dropping the guard disables it, after which the function can be hooked again. A panic inside `detour` aborts the process.
             ///
@@ -1236,13 +1503,220 @@ pub mod game {
             ///
             /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, or if patching fails.
             pub fn hook(
-                detour: impl Fn(
-                    Signature,
+                detour: impl for<'call> Fn(
+                    Original<'call>,
                     u32,
                     u32,
                     bool,
                     *mut f32,
                 ) -> u64 + Send + Sync + 'static,
+            ) -> ::imping_runtime::Result<::imping_runtime::Hook<Signature>> {
+                // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
+                unsafe {
+                    ::imping_runtime::__private::install(
+                        &super::super::MODULE,
+                        RVA,
+                        &[],
+                        &SLOT,
+                        ::std::boxed::Box::new(detour),
+                        thunk,
+                    )
+                }
+            }
+        }
+
+        /// `util::Release` at `game.exe+0x15f00`. Tags: `imping-safe`.
+        ///
+        /// # Safety
+        ///
+        /// Calls into `game.exe`: its `init()` must have succeeded, and the arguments must be valid for this function.
+        ///
+        /// # Panics
+        ///
+        /// If `game.exe`'s `init()` has not succeeded.
+        pub unsafe fn Release(memory: *mut ::core::ffi::c_void) {
+            // SAFETY: forwarded to the caller.
+            unsafe { Release::ptr()(memory) }
+        }
+
+        /// Address, signature and hook of `util::Release`.
+        pub mod Release {
+            /// The function's address relative to `game.exe`'s base.
+            pub const RVA: u32 = 0x15f00;
+            /// The function's type.
+            pub type Signature = unsafe extern "system" fn(
+                memory: *mut ::core::ffi::c_void,
+            );
+
+            /// The function's address in this process.
+            ///
+            /// # Panics
+            ///
+            /// If `game.exe`'s `init()` has not succeeded.
+            pub fn ptr() -> Signature {
+                // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
+                unsafe {
+                    ::core::mem::transmute::<
+                        usize,
+                        Signature,
+                    >(super::super::MODULE.address(RVA))
+                }
+            }
+
+            /// The original `util::Release`, handed to a hook's `detour` with the arguments of the call being hooked. It can only be used during that call.
+            pub struct Original<'call>(
+                Signature,
+                (*mut ::core::ffi::c_void,),
+                ::core::marker::PhantomData<&'call ()>,
+            );
+
+            impl Original<'_> {
+                /// Calls the original function with the arguments the target passed to the hooked call.
+                pub fn forward(self) {
+                    let (memory,) = self.1;
+                    // SAFETY: these are the arguments the target passed to the hooked call, so this is the call it was making; `init`'s caller promised the function has type `Signature`.
+                    unsafe { (self.0)(memory) }
+                }
+
+                /// Calls the original function with other arguments.
+                ///
+                /// # Safety
+                ///
+                /// The arguments must be valid for this function.
+                pub unsafe fn call(self, memory: *mut ::core::ffi::c_void) {
+                    // SAFETY: forwarded to the caller.
+                    unsafe { (self.0)(memory) }
+                }
+            }
+
+            static SLOT: ::imping_runtime::__private::Slot<
+                dyn for<'call> Fn(
+                    Original<'call>,
+                    *mut ::core::ffi::c_void,
+                ) + Send + Sync,
+                Signature,
+            > = ::imping_runtime::__private::Slot::new();
+            unsafe extern "system" fn thunk(memory: *mut ::core::ffi::c_void) {
+                let (detour, original) = SLOT.get();
+                detour(
+                    Original(original, (memory,), ::core::marker::PhantomData),
+                    memory,
+                )
+            }
+
+            /// Hooks `util::Release`: once enabled, every call runs `detour`, which receives an `Original` first, then the arguments. `original.forward()` calls the original function with the arguments the target passed; `original.call(..)` calls it with other ones.
+            ///
+            /// The hook is returned disabled; enable it with `Hook::enable`. Dropping the guard disables it, after which the function can be hooked again. A panic inside `detour` aborts the process.
+            ///
+            /// # Errors
+            ///
+            /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, or if patching fails.
+            pub fn hook(
+                detour: impl for<'call> Fn(
+                    Original<'call>,
+                    *mut ::core::ffi::c_void,
+                ) + Send + Sync + 'static,
+            ) -> ::imping_runtime::Result<::imping_runtime::Hook<Signature>> {
+                // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
+                unsafe {
+                    ::imping_runtime::__private::install(
+                        &super::super::MODULE,
+                        RVA,
+                        &[],
+                        &SLOT,
+                        ::std::boxed::Box::new(detour),
+                        thunk,
+                    )
+                }
+            }
+        }
+
+        /// `util::Store` at `game.exe+0x15f80`. Tags: `imping-safe`.
+        ///
+        /// # Safety
+        ///
+        /// Calls into `game.exe`: its `init()` must have succeeded, and the arguments must be valid for this function.
+        ///
+        /// # Panics
+        ///
+        /// If `game.exe`'s `init()` has not succeeded.
+        pub unsafe fn Store(holder: super::Holder) {
+            // SAFETY: forwarded to the caller.
+            unsafe { Store::ptr()(holder) }
+        }
+
+        /// Address, signature and hook of `util::Store`.
+        pub mod Store {
+            /// The function's address relative to `game.exe`'s base.
+            pub const RVA: u32 = 0x15f80;
+            /// The function's type.
+            pub type Signature = unsafe extern "system" fn(holder: super::super::Holder);
+
+            /// The function's address in this process.
+            ///
+            /// # Panics
+            ///
+            /// If `game.exe`'s `init()` has not succeeded.
+            pub fn ptr() -> Signature {
+                // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
+                unsafe {
+                    ::core::mem::transmute::<
+                        usize,
+                        Signature,
+                    >(super::super::MODULE.address(RVA))
+                }
+            }
+
+            /// The original `util::Store`, handed to a hook's `detour` with the arguments of the call being hooked. It can only be used during that call.
+            pub struct Original<'call>(
+                Signature,
+                (super::super::Holder,),
+                ::core::marker::PhantomData<&'call ()>,
+            );
+
+            impl Original<'_> {
+                /// Calls the original function with the arguments the target passed to the hooked call.
+                pub fn forward(self) {
+                    let (holder,) = self.1;
+                    // SAFETY: these are the arguments the target passed to the hooked call, so this is the call it was making; `init`'s caller promised the function has type `Signature`.
+                    unsafe { (self.0)(holder) }
+                }
+
+                /// Calls the original function with other arguments.
+                ///
+                /// # Safety
+                ///
+                /// The arguments must be valid for this function.
+                pub unsafe fn call(self, holder: super::super::Holder) {
+                    // SAFETY: forwarded to the caller.
+                    unsafe { (self.0)(holder) }
+                }
+            }
+
+            static SLOT: ::imping_runtime::__private::Slot<
+                dyn for<'call> Fn(Original<'call>, super::super::Holder) + Send + Sync,
+                Signature,
+            > = ::imping_runtime::__private::Slot::new();
+            unsafe extern "system" fn thunk(holder: super::super::Holder) {
+                let (detour, original) = SLOT.get();
+                detour(
+                    Original(original, (holder,), ::core::marker::PhantomData),
+                    holder,
+                )
+            }
+
+            /// Hooks `util::Store`: once enabled, every call runs `detour`, which receives an `Original` first, then the arguments. `original.forward()` calls the original function with the arguments the target passed; `original.call(..)` calls it with other ones.
+            ///
+            /// The hook is returned disabled; enable it with `Hook::enable`. Dropping the guard disables it, after which the function can be hooked again. A panic inside `detour` aborts the process.
+            ///
+            /// # Errors
+            ///
+            /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, or if patching fails.
+            pub fn hook(
+                detour: impl for<'call> Fn(
+                    Original<'call>,
+                    super::super::Holder,
+                ) + Send + Sync + 'static,
             ) -> ::imping_runtime::Result<::imping_runtime::Hook<Signature>> {
                 // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
                 unsafe {
@@ -1299,16 +1773,42 @@ pub mod game {
                     }
                 }
 
+                /// The original `Game::World::Tick`, handed to a hook's `detour` with the arguments of the call being hooked. It can only be used during that call.
+                pub struct Original<'call>(
+                    Signature,
+                    (),
+                    ::core::marker::PhantomData<&'call ()>,
+                );
+
+                impl Original<'_> {
+                    /// Calls the original function with the arguments the target passed to the hooked call.
+                    pub fn forward(self) {
+                        let () = self.1;
+                        // SAFETY: these are the arguments the target passed to the hooked call, so this is the call it was making; `init`'s caller promised the function has type `Signature`.
+                        unsafe { (self.0)() }
+                    }
+
+                    /// Calls the original function with other arguments.
+                    ///
+                    /// # Safety
+                    ///
+                    /// The arguments must be valid for this function.
+                    pub unsafe fn call(self) {
+                        // SAFETY: forwarded to the caller.
+                        unsafe { (self.0)() }
+                    }
+                }
+
                 static SLOT: ::imping_runtime::__private::Slot<
-                    dyn Fn(Signature) + Send + Sync,
+                    dyn for<'call> Fn(Original<'call>) + Send + Sync,
                     Signature,
                 > = ::imping_runtime::__private::Slot::new();
                 unsafe extern "system" fn thunk() {
                     let (detour, original) = SLOT.get();
-                    detour(original)
+                    detour(Original(original, (), ::core::marker::PhantomData))
                 }
 
-                /// Hooks `Game::World::Tick`: once enabled, every call runs `detour`, which receives the original function first, then the arguments.
+                /// Hooks `Game::World::Tick`: once enabled, every call runs `detour`, which receives an `Original` first, then the arguments. `original.forward()` calls the original function with the arguments the target passed; `original.call(..)` calls it with other ones.
                 ///
                 /// The hook is returned disabled; enable it with `Hook::enable`. Dropping the guard disables it, after which the function can be hooked again. A panic inside `detour` aborts the process.
                 ///
@@ -1316,7 +1816,7 @@ pub mod game {
                 ///
                 /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, or if patching fails.
                 pub fn hook(
-                    detour: impl Fn(Signature) + Send + Sync + 'static,
+                    detour: impl for<'call> Fn(Original<'call>) + Send + Sync + 'static,
                 ) -> ::imping_runtime::Result<::imping_runtime::Hook<Signature>> {
                     // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
                     unsafe {
@@ -1336,18 +1836,16 @@ pub mod game {
 
     /// Functions and globals in the `ui` namespace.
     pub mod ui {
-        /// `ui::SetTitle` at `game.exe+0x16200`.
+        /// `ui::SetTitle` at `game.exe+0x16200`. Tags: `imping-safe`.
         ///
-        /// # Safety
-        ///
-        /// Calls into `game.exe`: its `init()` must have succeeded, and the arguments must be valid for this function.
+        /// Tagged `imping-safe`, so it is safe to call: valid arguments are all it needs, and its pointer parameters are references.
         ///
         /// # Panics
         ///
         /// If `game.exe`'s `init()` has not succeeded.
-        pub unsafe fn SetTitle(title: ::imping_runtime::WStrPtr) {
-            // SAFETY: forwarded to the caller.
-            unsafe { SetTitle::ptr()(title) }
+        pub fn SetTitle(title: &::imping_runtime::WString) {
+            // SAFETY: the function is tagged `imping-safe` in the IR, which `init`'s caller vouched for: it needs only valid arguments and keeps none of the pointers, and the parameter types guarantee valid arguments.
+            unsafe { SetTitle::ptr()(title.as_ptr()) }
         }
 
         /// Address, signature and hook of `ui::SetTitle`.
@@ -1374,16 +1872,45 @@ pub mod game {
                 }
             }
 
+            /// The original `ui::SetTitle`, handed to a hook's `detour` with the arguments of the call being hooked. It can only be used during that call.
+            pub struct Original<'call>(
+                Signature,
+                (::imping_runtime::WStrPtr,),
+                ::core::marker::PhantomData<&'call ()>,
+            );
+
+            impl Original<'_> {
+                /// Calls the original function with the arguments the target passed to the hooked call.
+                pub fn forward(self) {
+                    let (title,) = self.1;
+                    // SAFETY: these are the arguments the target passed to the hooked call, so this is the call it was making; `init`'s caller promised the function has type `Signature`.
+                    unsafe { (self.0)(title) }
+                }
+
+                /// Calls the original function with other arguments.
+                ///
+                /// # Safety
+                ///
+                /// The arguments must be valid for this function.
+                pub unsafe fn call(self, title: ::imping_runtime::WStrPtr) {
+                    // SAFETY: forwarded to the caller.
+                    unsafe { (self.0)(title) }
+                }
+            }
+
             static SLOT: ::imping_runtime::__private::Slot<
-                dyn Fn(Signature, ::imping_runtime::WStrPtr) + Send + Sync,
+                dyn for<'call> Fn(
+                    Original<'call>,
+                    ::imping_runtime::WStrPtr,
+                ) + Send + Sync,
                 Signature,
             > = ::imping_runtime::__private::Slot::new();
             unsafe extern "system" fn thunk(title: ::imping_runtime::WStrPtr) {
                 let (detour, original) = SLOT.get();
-                detour(original, title)
+                detour(Original(original, (title,), ::core::marker::PhantomData), title)
             }
 
-            /// Hooks `ui::SetTitle`: once enabled, every call runs `detour`, which receives the original function first, then the arguments.
+            /// Hooks `ui::SetTitle`: once enabled, every call runs `detour`, which receives an `Original` first, then the arguments. `original.forward()` calls the original function with the arguments the target passed; `original.call(..)` calls it with other ones.
             ///
             /// The hook is returned disabled; enable it with `Hook::enable`. Dropping the guard disables it, after which the function can be hooked again. A panic inside `detour` aborts the process.
             ///
@@ -1391,8 +1918,8 @@ pub mod game {
             ///
             /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, or if patching fails.
             pub fn hook(
-                detour: impl Fn(
-                    Signature,
+                detour: impl for<'call> Fn(
+                    Original<'call>,
                     ::imping_runtime::WStrPtr,
                 ) + Send + Sync + 'static,
             ) -> ::imping_runtime::Result<::imping_runtime::Hook<Signature>> {
@@ -1410,22 +1937,26 @@ pub mod game {
             }
         }
 
-        /// `ui::Rename` at `game.exe+0x16300`.
+        /// `ui::Rename` at `game.exe+0x16300`. Tags: `imping-safe`.
         ///
-        /// # Safety
-        ///
-        /// Calls into `game.exe`: its `init()` must have succeeded, and the arguments must be valid for this function.
+        /// Tagged `imping-safe`, so it is safe to call: valid arguments are all it needs, and its pointer parameters are references.
         ///
         /// # Panics
         ///
         /// If `game.exe`'s `init()` has not succeeded.
-        pub unsafe fn Rename(
-            named: *mut super::Named,
-            tag: ::imping_runtime::CStrPtr,
-            data: *mut u8,
+        pub fn Rename(
+            named: &mut super::Named,
+            tag: &::core::ffi::CStr,
+            data: &mut u8,
         ) -> super::LPCSTR {
-            // SAFETY: forwarded to the caller.
-            unsafe { Rename::ptr()(named, tag, data) }
+            // SAFETY: the function is tagged `imping-safe` in the IR, which `init`'s caller vouched for: it needs only valid arguments and keeps none of the pointers, and the parameter types guarantee valid arguments.
+            unsafe {
+                Rename::ptr()(
+                    ::core::ptr::from_mut(named),
+                    ::imping_runtime::CStrPtr::new(tag.as_ptr()),
+                    ::core::ptr::from_mut(data),
+                )
+            }
         }
 
         /// Address, signature and hook of `ui::Rename`.
@@ -1453,9 +1984,40 @@ pub mod game {
                 }
             }
 
+            /// The original `ui::Rename`, handed to a hook's `detour` with the arguments of the call being hooked. It can only be used during that call.
+            pub struct Original<'call>(
+                Signature,
+                (*mut super::super::Named, ::imping_runtime::CStrPtr, *mut u8),
+                ::core::marker::PhantomData<&'call ()>,
+            );
+
+            impl Original<'_> {
+                /// Calls the original function with the arguments the target passed to the hooked call.
+                pub fn forward(self) -> super::super::LPCSTR {
+                    let (named, tag, data) = self.1;
+                    // SAFETY: these are the arguments the target passed to the hooked call, so this is the call it was making; `init`'s caller promised the function has type `Signature`.
+                    unsafe { (self.0)(named, tag, data) }
+                }
+
+                /// Calls the original function with other arguments.
+                ///
+                /// # Safety
+                ///
+                /// The arguments must be valid for this function.
+                pub unsafe fn call(
+                    self,
+                    named: *mut super::super::Named,
+                    tag: ::imping_runtime::CStrPtr,
+                    data: *mut u8,
+                ) -> super::super::LPCSTR {
+                    // SAFETY: forwarded to the caller.
+                    unsafe { (self.0)(named, tag, data) }
+                }
+            }
+
             static SLOT: ::imping_runtime::__private::Slot<
-                dyn Fn(
-                    Signature,
+                dyn for<'call> Fn(
+                    Original<'call>,
                     *mut super::super::Named,
                     ::imping_runtime::CStrPtr,
                     *mut u8,
@@ -1468,10 +2030,15 @@ pub mod game {
                 data: *mut u8,
             ) -> super::super::LPCSTR {
                 let (detour, original) = SLOT.get();
-                detour(original, named, tag, data)
+                detour(
+                    Original(original, (named, tag, data), ::core::marker::PhantomData),
+                    named,
+                    tag,
+                    data,
+                )
             }
 
-            /// Hooks `ui::Rename`: once enabled, every call runs `detour`, which receives the original function first, then the arguments.
+            /// Hooks `ui::Rename`: once enabled, every call runs `detour`, which receives an `Original` first, then the arguments. `original.forward()` calls the original function with the arguments the target passed; `original.call(..)` calls it with other ones.
             ///
             /// The hook is returned disabled; enable it with `Hook::enable`. Dropping the guard disables it, after which the function can be hooked again. A panic inside `detour` aborts the process.
             ///
@@ -1479,8 +2046,8 @@ pub mod game {
             ///
             /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, or if patching fails.
             pub fn hook(
-                detour: impl Fn(
-                    Signature,
+                detour: impl for<'call> Fn(
+                    Original<'call>,
                     *mut super::super::Named,
                     ::imping_runtime::CStrPtr,
                     *mut u8,
@@ -1503,17 +2070,15 @@ pub mod game {
 
     /// Functions and globals in the `math` namespace.
     pub mod math {
-        /// `math::Normalize` at `game.exe+0x16100`.
+        /// `math::Normalize` at `game.exe+0x16100`. Tags: `imping-safe`.
         ///
-        /// # Safety
-        ///
-        /// Calls into `game.exe`: its `init()` must have succeeded, and the arguments must be valid for this function.
+        /// Tagged `imping-safe`, so it is safe to call: valid arguments are all it needs, and its pointer parameters are references.
         ///
         /// # Panics
         ///
         /// If `game.exe`'s `init()` has not succeeded.
-        pub unsafe fn Normalize(v: super::Vector3) -> super::Vector3 {
-            // SAFETY: forwarded to the caller.
+        pub fn Normalize(v: super::Vector3) -> super::Vector3 {
+            // SAFETY: the function is tagged `imping-safe` in the IR, which `init`'s caller vouched for: it needs only valid arguments and keeps none of the pointers, and the parameter types guarantee valid arguments.
             unsafe { Normalize::ptr()(v) }
         }
 
@@ -1540,9 +2105,38 @@ pub mod game {
                 }
             }
 
+            /// The original `math::Normalize`, handed to a hook's `detour` with the arguments of the call being hooked. It can only be used during that call.
+            pub struct Original<'call>(
+                Signature,
+                (super::super::Vector3,),
+                ::core::marker::PhantomData<&'call ()>,
+            );
+
+            impl Original<'_> {
+                /// Calls the original function with the arguments the target passed to the hooked call.
+                pub fn forward(self) -> super::super::Vector3 {
+                    let (v,) = self.1;
+                    // SAFETY: these are the arguments the target passed to the hooked call, so this is the call it was making; `init`'s caller promised the function has type `Signature`.
+                    unsafe { (self.0)(v) }
+                }
+
+                /// Calls the original function with other arguments.
+                ///
+                /// # Safety
+                ///
+                /// The arguments must be valid for this function.
+                pub unsafe fn call(
+                    self,
+                    v: super::super::Vector3,
+                ) -> super::super::Vector3 {
+                    // SAFETY: forwarded to the caller.
+                    unsafe { (self.0)(v) }
+                }
+            }
+
             static SLOT: ::imping_runtime::__private::Slot<
-                dyn Fn(
-                    Signature,
+                dyn for<'call> Fn(
+                    Original<'call>,
                     super::super::Vector3,
                 ) -> super::super::Vector3 + Send + Sync,
                 Signature,
@@ -1551,10 +2145,10 @@ pub mod game {
                 v: super::super::Vector3,
             ) -> super::super::Vector3 {
                 let (detour, original) = SLOT.get();
-                detour(original, v)
+                detour(Original(original, (v,), ::core::marker::PhantomData), v)
             }
 
-            /// Hooks `math::Normalize`: once enabled, every call runs `detour`, which receives the original function first, then the arguments.
+            /// Hooks `math::Normalize`: once enabled, every call runs `detour`, which receives an `Original` first, then the arguments. `original.forward()` calls the original function with the arguments the target passed; `original.call(..)` calls it with other ones.
             ///
             /// The hook is returned disabled; enable it with `Hook::enable`. Dropping the guard disables it, after which the function can be hooked again. A panic inside `detour` aborts the process.
             ///
@@ -1562,8 +2156,8 @@ pub mod game {
             ///
             /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, or if patching fails.
             pub fn hook(
-                detour: impl Fn(
-                    Signature,
+                detour: impl for<'call> Fn(
+                    Original<'call>,
                     super::super::Vector3,
                 ) -> super::super::Vector3 + Send + Sync + 'static,
             ) -> ::imping_runtime::Result<::imping_runtime::Hook<Signature>> {

@@ -47,6 +47,12 @@ fn types_x64() {
             "`game.exe` type `LoopB` emitted as opaque bytes: it is part of a typedef cycle",
             "`game.exe` function `util::FastPath` uses custom storage; only its RVA is generated",
             "`game.exe` function `util::TakesRenderer` skipped: parameter `r` has no known size",
+            "`game.exe` function `util::Mixed` is tagged `imping-safe` but its call stays unsafe: \
+             parameter `type` is an array",
+            "`game.exe` function `util::Release` is tagged `imping-safe` but its call stays \
+             unsafe: parameter `memory` is a `void` pointer",
+            "`game.exe` function `util::Store` is tagged `imping-safe` but its call stays unsafe: \
+             parameter `holder` is passed by value and contains pointers",
             "`game.exe` vtable `game::Entity` skipped; vtables are not supported yet",
         ]
     );

@@ -10,7 +10,7 @@ use crate::Warning;
 use crate::emit::{doc, docs, hex, qualified};
 use crate::layout::Layouts;
 use crate::names::{self, Scope, doc_name, ident};
-use crate::types::{self, TypeTable};
+use crate::types::{self, Text, TypeTable};
 use imping_ir::{Function, Global, TypeId, TypeKind};
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
@@ -19,6 +19,12 @@ use std::collections::HashMap;
 /// The most parameters a hookable function may have; the hooking engine
 /// supports up to 14.
 const MAX_HOOK_PARAMETERS: usize = 14;
+
+/// The function tag that marks a function as safe to call with valid
+/// arguments: it has no other preconditions (any time, any thread) and does
+/// not keep its pointer arguments after returning. Such functions get a safe
+/// call wrapper whose pointer parameters are references.
+pub(crate) const SAFE_TAG: &str = "imping-safe";
 
 /// The functions and globals of one namespace, and its child namespaces.
 struct Namespace {
@@ -160,6 +166,9 @@ struct Parameter {
     name: Ident,
     outer: TokenStream,
     inner: TokenStream,
+    /// The IR type, and the IR name for messages.
+    type_id: TypeId,
+    source: String,
 }
 
 /// Whether a type can be passed or returned by value. Arrays and function
@@ -183,6 +192,90 @@ fn value_type(table: &TypeTable<'_>, id: TypeId, depth: usize) -> TokenStream {
             }
         },
         _ => table.rust_type(id, depth),
+    }
+}
+
+/// A parameter of a safe call wrapper: its declaration, and the expression
+/// that passes it to the raw function.
+struct SafeParameter {
+    declaration: TokenStream,
+    argument: TokenStream,
+}
+
+/// The safe form of a parameter of a function tagged [`SAFE_TAG`], or why it
+/// has none. Data pointers become references (text pointers `&CStr` or
+/// `&WString`); by-value parameters must contain no data pointers, since safe
+/// code could put any address in them.
+fn safe_parameter(
+    table: &TypeTable<'_>,
+    layouts: &Layouts,
+    parameter: &Parameter,
+    depth: usize,
+) -> Result<SafeParameter, String> {
+    let Parameter {
+        name,
+        outer,
+        type_id,
+        source,
+        ..
+    } = parameter;
+    let unchanged = || SafeParameter {
+        declaration: quote! { #name: #outer },
+        argument: quote! { #name },
+    };
+    let text = |text: Text| match text {
+        Text::Narrow => SafeParameter {
+            declaration: quote! { #name: &::core::ffi::CStr },
+            argument: quote! { ::imping_runtime::CStrPtr::new(#name.as_ptr()) },
+        },
+        Text::Wide => SafeParameter {
+            declaration: quote! { #name: &::imping_runtime::WString },
+            argument: quote! { #name.as_ptr() },
+        },
+    };
+    let def = table
+        .peel(*type_id)
+        .ok_or_else(|| format!("parameter `{source}` is part of a typedef cycle"))?;
+    match &def.kind {
+        TypeKind::Pointer { pointee, is_const } => {
+            if table
+                .peel(*pointee)
+                .is_some_and(|def| matches!(def.kind, TypeKind::Function { .. }))
+            {
+                return Ok(unchanged());
+            }
+            if let Some(kind) = table.text_kind(*pointee) {
+                return Ok(text(kind));
+            }
+            if table.is_void(*pointee) {
+                return Err(format!("parameter `{source}` is a `void` pointer"));
+            }
+            if layouts.layout(*pointee).is_none() {
+                return Err(format!(
+                    "parameter `{source}` points to a type of unknown size"
+                ));
+            }
+            let target = table.rust_type(*pointee, depth);
+            Ok(if *is_const {
+                SafeParameter {
+                    declaration: quote! { #name: &#target },
+                    argument: quote! { ::core::ptr::from_ref(#name) },
+                }
+            } else {
+                SafeParameter {
+                    declaration: quote! { #name: &mut #target },
+                    argument: quote! { ::core::ptr::from_mut(#name) },
+                }
+            })
+        }
+        TypeKind::Array { element, .. } => match table.text_kind(*element) {
+            Some(kind) => Ok(text(kind)),
+            None => Err(format!("parameter `{source}` is an array")),
+        },
+        _ if table.is_pointer_free(*type_id) => Ok(unchanged()),
+        _ => Err(format!(
+            "parameter `{source}` is passed by value and contains pointers"
+        )),
     }
 }
 
@@ -214,6 +307,8 @@ fn parameters(
             name: ident(&scope.claim_numbered(&names::sanitize(&source_name))),
             outer: value_type(table, parameter.type_id, depth),
             inner: value_type(table, parameter.type_id, depth + 1),
+            type_id: parameter.type_id,
+            source: source_name,
         });
     }
     Ok(parameters)
@@ -366,33 +461,80 @@ fn emit_function(
         TokenStream::new()
     };
 
-    let wrapper_params = parameters
-        .iter()
-        .map(|Parameter { name, outer, .. }| quote! { #name: #outer });
-    let args = parameters.iter().map(|parameter| &parameter.name);
+    let safe = if function.tags.iter().any(|tag| tag == SAFE_TAG) {
+        match parameters
+            .iter()
+            .map(|parameter| safe_parameter(table, layouts, parameter, depth))
+            .collect::<Result<Vec<_>, _>>()
+        {
+            Ok(safe) => Some(safe),
+            Err(reason) => {
+                warnings.push(Warning::SafeCallUnavailable {
+                    module: module.name.clone(),
+                    function: qualified_name.clone(),
+                    reason,
+                });
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     let mut wrapper_paragraphs = vec![summary];
     if parameters.len() > MAX_HOOK_PARAMETERS {
         wrapper_paragraphs.push(format!(
             "It has more than {MAX_HOOK_PARAMETERS} parameters, so it can't be hooked."
         ));
     }
-    wrapper_paragraphs.extend([
-        "# Safety".to_owned(),
-        format!(
-            "Calls into `{file}`: its `init()` must have succeeded, and the arguments must be \
-             valid for this function."
-        ),
+    let panics = [
         "# Panics".to_owned(),
         format!("If `{file}`'s `init()` has not succeeded."),
-    ]);
-    let wrapper_doc = docs(&wrapper_paragraphs);
+    ];
+    let wrapper = match safe {
+        Some(safe) => {
+            wrapper_paragraphs.push(format!(
+                "Tagged `{SAFE_TAG}`, so it is safe to call: valid arguments are all it needs, \
+                 and its pointer parameters are references."
+            ));
+            wrapper_paragraphs.extend(panics);
+            let wrapper_doc = docs(&wrapper_paragraphs);
+            let declarations = safe.iter().map(|parameter| &parameter.declaration);
+            let arguments = safe.iter().map(|parameter| &parameter.argument);
+            quote! {
+                #wrapper_doc
+                pub fn #fn_ident(#(#declarations),*) #output_outer {
+                    #[comment = " SAFETY: the function is tagged `imping-safe` in the IR, which `init`'s caller vouched for: it needs only valid arguments and keeps none of the pointers, and the parameter types guarantee valid arguments."]
+                    unsafe { #fn_ident::ptr()(#(#arguments),*) }
+                }
+            }
+        }
+        None => {
+            wrapper_paragraphs.extend([
+                "# Safety".to_owned(),
+                format!(
+                    "Calls into `{file}`: its `init()` must have succeeded, and the arguments \
+                     must be valid for this function."
+                ),
+            ]);
+            wrapper_paragraphs.extend(panics);
+            let wrapper_doc = docs(&wrapper_paragraphs);
+            let wrapper_params = parameters
+                .iter()
+                .map(|Parameter { name, outer, .. }| quote! { #name: #outer });
+            let args = parameters.iter().map(|parameter| &parameter.name);
+            quote! {
+                #wrapper_doc
+                pub unsafe fn #fn_ident(#(#wrapper_params),*) #output_outer {
+                    #[comment = " SAFETY: forwarded to the caller."]
+                    unsafe { #fn_ident::ptr()(#(#args),*) }
+                }
+            }
+        }
+    };
     let module_doc = doc(format!("Address, signature and hook of `{shown}`."));
     quote! {
-        #wrapper_doc
-        pub unsafe fn #fn_ident(#(#wrapper_params),*) #output_outer {
-            #[comment = " SAFETY: forwarded to the caller."]
-            unsafe { #fn_ident::ptr()(#(#args),*) }
-        }
+        #wrapper
 
         #module_doc
         pub mod #fn_ident {
@@ -420,11 +562,12 @@ fn hook_items(
         .iter()
         .map(|parameter| &parameter.inner)
         .collect();
-    let thunk_params = parameters
+    let thunk_params: Vec<TokenStream> = parameters
         .iter()
-        .map(|Parameter { name, inner, .. }| quote! { #name: #inner });
-    let args = parameters.iter().map(|parameter| &parameter.name);
-    let bound = quote! { Fn(Signature, #(#types),*) #output };
+        .map(|Parameter { name, inner, .. }| quote! { #name: #inner })
+        .collect();
+    let args: Vec<&Ident> = parameters.iter().map(|parameter| &parameter.name).collect();
+    let bound = quote! { for<'call> Fn(Original<'call>, #(#types),*) #output };
     let verification = if verified {
         quote! { VERIFICATION }
     } else {
@@ -440,8 +583,10 @@ fn hook_items(
     errors.push_str(", or if patching fails.");
     let hook_doc = docs(&[
         format!(
-            "Hooks `{shown}`: once enabled, every call runs `detour`, which receives the \
-             original function first, then the arguments."
+            "Hooks `{shown}`: once enabled, every call runs `detour`, which receives an \
+             `Original` first, then the arguments. `original.forward()` calls the original \
+             function with the arguments the target passed; `original.call(..)` calls it with \
+             other ones."
         ),
         "The hook is returned disabled; enable it with `Hook::enable`. Dropping the guard \
          disables it, after which the function can be hooked again. A panic inside `detour` \
@@ -450,13 +595,43 @@ fn hook_items(
         "# Errors".to_owned(),
         errors,
     ]);
+    let original_doc = docs(&[format!(
+        "The original `{shown}`, handed to a hook's `detour` with the arguments of the call \
+             being hooked. It can only be used during that call."
+    )]);
+    let call_doc = docs(&[
+        "Calls the original function with other arguments.".to_owned(),
+        "# Safety".to_owned(),
+        "The arguments must be valid for this function.".to_owned(),
+    ]);
     quote! {
+        #original_doc
+        pub struct Original<'call>(Signature, (#(#types,)*), ::core::marker::PhantomData<&'call ()>);
+
+        impl Original<'_> {
+            /// Calls the original function with the arguments the target passed to the hooked call.
+            pub fn forward(self) #output {
+                let (#(#args,)*) = self.1;
+                #[comment = " SAFETY: these are the arguments the target passed to the hooked call, so this is the call it was making; `init`'s caller promised the function has type `Signature`."]
+                unsafe { (self.0)(#(#args),*) }
+            }
+
+            #call_doc
+            pub unsafe fn call(self, #(#thunk_params),*) #output {
+                #[comment = " SAFETY: forwarded to the caller."]
+                unsafe { (self.0)(#(#args),*) }
+            }
+        }
+
         static SLOT: ::imping_runtime::__private::Slot<dyn #bound + Send + Sync, Signature> =
             ::imping_runtime::__private::Slot::new();
 
         unsafe extern #abi fn thunk(#(#thunk_params),*) #output {
             let (detour, original) = SLOT.get();
-            detour(original, #(#args),*)
+            detour(
+                Original(original, (#(#args,)*), ::core::marker::PhantomData),
+                #(#args),*
+            )
         }
 
         #hook_doc
