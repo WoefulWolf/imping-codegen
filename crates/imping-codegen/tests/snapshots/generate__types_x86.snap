@@ -13,25 +13,46 @@ expression: bindings.source()
     clippy::all
 )]
 pub mod game32 {
-    /// The identity of `Game32.exe` these bindings were generated from.
+    /// The builds of `Game32.exe` these bindings accept, the one they were generated from first.
     pub static MODULE: ::imping_runtime::Module = ::imping_runtime::Module::new(
         "Game32.exe",
-        0x5f1e2d3c,
-        0x2a0000,
+        &[
+            ::imping_runtime::Build {
+                timestamp: 0x5f1e2d3c,
+                image_size: 0x2a0000,
+            },
+        ],
     );
 
-    /// Finds `Game32.exe` in this process and checks it is the build these bindings were generated from. Call it before calling or hooking anything in this module; once it has succeeded, calling it again does nothing.
+    /// Finds `Game32.exe` in this process and checks it is a build these bindings accept. Call it before calling or hooking anything in this module; once it has succeeded, calling it again does nothing.
     ///
     /// # Errors
     ///
-    /// Fails if `Game32.exe` is not loaded or is a different build; see `imping_runtime::Module::init`. It can be called again later, for instance once a DLL has been loaded.
+    /// Fails if `Game32.exe` is not loaded or is none of the accepted builds; see `imping_runtime::Module::init`. It can be called again later, for instance once a DLL has been loaded.
     ///
     /// # Safety
     ///
-    /// The IR these bindings were generated from must correctly describe this build of `Game32.exe`: addresses, function signatures and type layouts. `init` checks the build's identity (timestamp and image size); the rest is the caller's promise, which is what makes every `hook` in this module safe.
+    /// The IR these bindings were generated from must correctly describe every build of `Game32.exe` they accept: addresses, function signatures and type layouts. `init` checks the build's identity (timestamp and image size); the rest is the caller's promise, which is what makes every `hook` in this module safe.
     pub unsafe fn init() -> ::core::result::Result<(), ::imping_runtime::Error> {
         // SAFETY: forwarded to the caller.
         unsafe { MODULE.init() }
+    }
+
+    /// Finds `Game32.exe` in this process and initializes it whatever build it is, returning              the build found; for trying a build these bindings don't accept. `init` is the              checked way in.
+    ///
+    /// # Errors
+    ///
+    /// Fails if `Game32.exe` is not loaded; see `imping_runtime::Module::init_any_build`.
+    ///
+    /// # Safety
+    ///
+    /// Everything done through this module must be correct for the build of `Game32.exe`              that is loaded, which nothing has checked. Each `hook` still compares the              function's first bytes where the IR has them; calls and globals are used as they are.
+    pub unsafe fn init_any_build() -> ::core::result::Result<
+        ::imping_runtime::Build,
+        ::imping_runtime::Error,
+    > {
+        // SAFETY: forwarded to the caller.
+        unsafe { MODULE.init_any_build() }
     }
 
     const _: () = ::core::assert!(

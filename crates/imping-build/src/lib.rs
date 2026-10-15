@@ -27,6 +27,7 @@
 //! ```text
 //! cargo install --path crates/imping-build --features cli
 //! imping generate ir/game.json -o src/imped.rs --module-name GameAssembly.dll=game
+//! imping generate ir/game.json -o src/imped.rs --accept-build game.exe=0x64b8f2a1:0xa3c000
 //! imping check ir/game.json
 //! ```
 
@@ -74,6 +75,29 @@ impl Builder {
     /// [`imping_codegen::Generator::module_name`].
     pub fn module_name(mut self, ir_name: impl Into<String>, rust_name: impl Into<String>) -> Self {
         self.generator = self.generator.module_name(ir_name, rust_name);
+        self
+    }
+
+    /// Makes the generated `init()` of the IR module `ir_name` also accept the
+    /// build with this timestamp and image size, besides the build the IR was
+    /// made from. See [`imping_codegen::Generator::accept_build`].
+    ///
+    /// ```no_run
+    /// // build.rs: the shipped game.exe is wrapped by a packer that keeps the
+    /// // timestamp but grows the image.
+    /// fn main() -> Result<(), imping_build::Error> {
+    ///     imping_build::Builder::new("ir/game.json")
+    ///         .accept_build("game.exe", 0x64b8f2a1, 0xa3c000)
+    ///         .generate()
+    /// }
+    /// ```
+    pub fn accept_build(
+        mut self,
+        ir_name: impl Into<String>,
+        timestamp: u32,
+        image_size: u32,
+    ) -> Self {
+        self.generator = self.generator.accept_build(ir_name, timestamp, image_size);
         self
     }
 

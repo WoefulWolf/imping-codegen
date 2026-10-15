@@ -16,10 +16,18 @@ use std::collections::HashSet;
 
 /// Emits the `pub mod` for one IR module: its identity and `init`, then its
 /// types, functions and globals, each in the module of its namespace.
-pub(crate) fn module(module: &Module, rust_name: &str, warnings: &mut Vec<Warning>) -> TokenStream {
+/// The bindings for one IR module. `extra_builds` are the builds (timestamp,
+/// image size) accepted besides the IR's own.
+pub(crate) fn module(
+    module: &Module,
+    rust_name: &str,
+    extra_builds: &[(u32, u32)],
+    warnings: &mut Vec<Warning>,
+) -> TokenStream {
     let mut scope = Scope::default();
     scope.reserve("MODULE");
     scope.reserve("init");
+    scope.reserve("init_any_build");
     // Namespaces of functions and globals come first, so giving types
     // namespaces never renames the modules functions and globals already use.
     let mut root = Namespace::root(scope);
@@ -57,7 +65,7 @@ pub(crate) fn module(module: &Module, rust_name: &str, warnings: &mut Vec<Warnin
         module.timestamp,
         module.image_size
     ));
-    let identity = identity(module, architecture);
+    let identity = identity(module, extra_builds, architecture);
     let name = ident(rust_name);
     quote! {
         #doc
@@ -70,32 +78,53 @@ pub(crate) fn module(module: &Module, rust_name: &str, warnings: &mut Vec<Warnin
 }
 
 /// `MODULE`, `init()` and the compile-time check of the target architecture.
-fn identity(module: &Module, architecture: &str) -> TokenStream {
+fn identity(module: &Module, extra_builds: &[(u32, u32)], architecture: &str) -> TokenStream {
     let file = doc_name(&module.name);
     let name = Literal::string(&module.name);
-    let timestamp = hex(u64::from(module.timestamp));
-    let image_size = hex(u64::from(module.image_size));
+    // The IR's own build first, then the extra ones, without repeats.
+    let mut builds = vec![(module.timestamp, module.image_size)];
+    for build in extra_builds {
+        if !builds.contains(build) {
+            builds.push(*build);
+        }
+    }
+    let builds = builds.iter().map(|&(timestamp, image_size)| {
+        let timestamp = hex(u64::from(timestamp));
+        let image_size = hex(u64::from(image_size));
+        quote! { ::imping_runtime::Build { timestamp: #timestamp, image_size: #image_size } }
+    });
     let module_doc = doc(format!(
-        "The identity of `{file}` these bindings were generated from."
+        "The builds of `{file}` these bindings accept, the one they were generated from first."
     ));
     let init_doc = docs(&[
         format!(
-            "Finds `{file}` in this process and checks it is the build these bindings were \
-             generated from. Call it before calling or hooking anything in this module; once \
-             it has succeeded, calling it again does nothing."
+            "Finds `{file}` in this process and checks it is a build these bindings accept. \
+             Call it before calling or hooking anything in this module; once it has succeeded, \
+             calling it again does nothing."
         ),
         "# Errors".to_owned(),
         format!(
-            "Fails if `{file}` is not loaded or is a different build; see \
+            "Fails if `{file}` is not loaded or is none of the accepted builds; see \
              `imping_runtime::Module::init`. It can be called again later, for instance once \
              a DLL has been loaded."
         ),
         "# Safety".to_owned(),
         format!(
-            "The IR these bindings were generated from must correctly describe this build of \
-             `{file}`: addresses, function signatures and type layouts. `init` checks the \
-             build's identity (timestamp and image size); the rest is the caller's promise, \
-             which is what makes every `hook` in this module safe."
+            "The IR these bindings were generated from must correctly describe every build of \
+             `{file}` they accept: addresses, function signatures and type layouts. `init` \
+             checks the build's identity (timestamp and image size); the rest is the caller's \
+             promise, which is what makes every `hook` in this module safe."
+        ),
+    ]);
+    let any_build_doc = docs(&[
+        format!(
+            "Finds `{file}` in this process and initializes it whatever build it is, returning              the build found; for trying a build these bindings don't accept. `init` is the              checked way in."
+        ),
+        "# Errors".to_owned(),
+        format!("Fails if `{file}` is not loaded; see `imping_runtime::Module::init_any_build`."),
+        "# Safety".to_owned(),
+        format!(
+            "Everything done through this module must be correct for the build of `{file}`              that is loaded, which nothing has checked. Each `hook` still compares the              function's first bytes where the IR has them; calls and globals are used as they are."
         ),
     ]);
     let (target_arch, label) = match module.architecture {
@@ -109,12 +138,18 @@ fn identity(module: &Module, architecture: &str) -> TokenStream {
     quote! {
         #module_doc
         pub static MODULE: ::imping_runtime::Module =
-            ::imping_runtime::Module::new(#name, #timestamp, #image_size);
+            ::imping_runtime::Module::new(#name, &[#(#builds),*]);
 
         #init_doc
         pub unsafe fn init() -> ::core::result::Result<(), ::imping_runtime::Error> {
             #[comment = " SAFETY: forwarded to the caller."]
             unsafe { MODULE.init() }
+        }
+
+        #any_build_doc
+        pub unsafe fn init_any_build() -> ::core::result::Result<::imping_runtime::Build, ::imping_runtime::Error> {
+            #[comment = " SAFETY: forwarded to the caller."]
+            unsafe { MODULE.init_any_build() }
         }
 
         const _: () = ::core::assert!(::core::cfg!(target_arch = #target_arch), #message);

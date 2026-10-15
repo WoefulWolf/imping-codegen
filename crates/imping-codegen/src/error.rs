@@ -18,9 +18,12 @@ pub enum Error {
         /// The Rust module name both would get.
         rust_name: String,
     },
-    /// [`Generator::module_name`](crate::Generator::module_name) names a module
-    /// that isn't in the IR.
+    /// [`Generator::module_name`](crate::Generator::module_name) or
+    /// [`Generator::accept_build`](crate::Generator::accept_build) names a
+    /// module that isn't in the IR.
     UnknownModule {
+        /// The option that named it: `"module_name"` or `"accept_build"`.
+        option: &'static str,
         /// The IR module name given.
         name: String,
     },
@@ -44,8 +47,8 @@ impl fmt::Display for Error {
                 f,
                 "IR modules `{first}` and `{second}` both become Rust module `{rust_name}`; rename one"
             ),
-            Error::UnknownModule { name } => {
-                write!(f, "`module_name` names `{name}`, which is not in the IR")
+            Error::UnknownModule { option, name } => {
+                write!(f, "`{option}` names `{name}`, which is not in the IR")
             }
             Error::InvalidModuleName { name } => {
                 write!(f, "`{name}` is not a valid Rust module name")

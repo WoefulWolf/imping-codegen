@@ -105,6 +105,50 @@ fn module_name_overrides_the_derived_name() {
 }
 
 #[test]
+fn accept_build_lists_extra_builds_after_the_ir_build() {
+    let ir = load("x86.json");
+    let bindings = Generator::new()
+        .accept_build("Game32.exe", 0x5f1e2d3c, 0x2b0000)
+        // The IR's own build is not repeated.
+        .accept_build("Game32.exe", 0x5f1e2d3c, 0x2a0000)
+        .generate(&ir)
+        .unwrap();
+    let source = bindings.source();
+    let own = source.find("image_size: 0x2a0000").expect("the IR's build");
+    let extra = source
+        .find("image_size: 0x2b0000")
+        .expect("the extra build");
+    assert!(own < extra, "the IR's build comes first");
+    assert_eq!(source.matches("image_size: 0x2a0000").count(), 1);
+    assert_eq!(source.matches("::imping_runtime::Build {").count(), 2);
+}
+
+#[test]
+fn modules_can_be_initialized_whatever_their_build() {
+    let ir = load("x86.json");
+    let source = Generator::new().generate(&ir).unwrap().into_source();
+    assert!(source.contains("pub unsafe fn init_any_build() -> ::core::result::Result<"));
+    assert!(source.contains("unsafe { MODULE.init_any_build() }"));
+}
+
+#[test]
+fn rejects_an_extra_build_of_an_unknown_module() {
+    let ir = module_with_types("game.exe", "[]");
+    let error = Generator::new()
+        .accept_build("other.dll", 1, 2)
+        .generate(&ir)
+        .unwrap_err();
+    assert!(matches!(
+        &error,
+        Error::UnknownModule { option: "accept_build", name } if name == "other.dll"
+    ));
+    assert_eq!(
+        error.to_string(),
+        "`accept_build` names `other.dll`, which is not in the IR"
+    );
+}
+
+#[test]
 fn rejects_invalid_ir() {
     let ir = module_with_types(
         "game.exe",
@@ -125,7 +169,10 @@ fn rejects_a_rename_of_an_unknown_module() {
         .module_name("other.dll", "other")
         .generate(&ir)
         .unwrap_err();
-    assert!(matches!(&error, Error::UnknownModule { name } if name == "other.dll"));
+    assert!(matches!(
+        &error,
+        Error::UnknownModule { option: "module_name", name } if name == "other.dll"
+    ));
     assert_eq!(
         error.to_string(),
         "`module_name` names `other.dll`, which is not in the IR"

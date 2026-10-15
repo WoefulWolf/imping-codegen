@@ -80,6 +80,8 @@ use std::collections::HashMap;
 pub struct Generator {
     /// IR module name -> Rust module name overrides, in call order.
     module_names: Vec<(String, String)>,
+    /// Extra accepted builds: IR module name, timestamp, image size.
+    accepted_builds: Vec<(String, u32, u32)>,
 }
 
 impl Generator {
@@ -103,6 +105,30 @@ impl Generator {
         self
     }
 
+    /// Makes the generated `init()` of the IR module `ir_name` also accept the
+    /// build with this timestamp and image size, besides the build the IR was
+    /// made from.
+    ///
+    /// For the same code in a different image, such as an executable wrapped by
+    /// a packer or DRM layer that keeps the timestamp but grows the image. The
+    /// generated bindings promise the IR describes every build they accept, so
+    /// only add builds whose code and data match the analysed one.
+    ///
+    /// ```
+    /// let generator = imping_codegen::Generator::new()
+    ///     .accept_build("game.exe", 0x64b8f2a1, 0xa3c000);
+    /// ```
+    pub fn accept_build(
+        mut self,
+        ir_name: impl Into<String>,
+        timestamp: u32,
+        image_size: u32,
+    ) -> Self {
+        self.accepted_builds
+            .push((ir_name.into(), timestamp, image_size));
+        self
+    }
+
     /// Generates the bindings for every module in `ir`.
     ///
     /// The IR is validated first. Anything the generator can't represent is
@@ -111,8 +137,8 @@ impl Generator {
     /// # Errors
     ///
     /// - [`Error::InvalidIr`] if `ir` fails [`Ir::validate`].
-    /// - [`Error::UnknownModule`] if a [`module_name`](Self::module_name)
-    ///   names a module that isn't in `ir`.
+    /// - [`Error::UnknownModule`] if a [`module_name`](Self::module_name) or
+    ///   [`accept_build`](Self::accept_build) names a module that isn't in `ir`.
     /// - [`Error::InvalidModuleName`] if a [`module_name`](Self::module_name)
     ///   isn't a valid Rust module name.
     /// - [`Error::ModuleNameClash`] if two IR modules would get the same Rust
@@ -124,6 +150,7 @@ impl Generator {
         for (ir_name, rust_name) in &self.module_names {
             if !ir.modules.iter().any(|module| module.name == *ir_name) {
                 return Err(Error::UnknownModule {
+                    option: "module_name",
                     name: ir_name.clone(),
                 });
             }
@@ -133,6 +160,20 @@ impl Generator {
                 });
             }
             overrides.insert(ir_name, rust_name);
+        }
+
+        let mut extra_builds: HashMap<&str, Vec<(u32, u32)>> = HashMap::new();
+        for (ir_name, timestamp, image_size) in &self.accepted_builds {
+            if !ir.modules.iter().any(|module| module.name == *ir_name) {
+                return Err(Error::UnknownModule {
+                    option: "accept_build",
+                    name: ir_name.clone(),
+                });
+            }
+            extra_builds
+                .entry(ir_name)
+                .or_default()
+                .push((*timestamp, *image_size));
         }
 
         let mut taken: HashMap<String, &str> = HashMap::new();
@@ -157,7 +198,12 @@ impl Generator {
             .modules
             .iter()
             .zip(&rust_names)
-            .map(|(module, rust_name)| emit::module(module, rust_name, &mut warnings));
+            .map(|(module, rust_name)| {
+                let extra = extra_builds
+                    .get(module.name.as_str())
+                    .map_or(&[][..], Vec::as_slice);
+                emit::module(module, rust_name, extra, &mut warnings)
+            });
         let source = format::render(quote::quote! { #(#items)* });
         Ok(Bindings { source, warnings })
     }

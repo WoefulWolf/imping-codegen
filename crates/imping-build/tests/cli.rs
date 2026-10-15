@@ -96,10 +96,36 @@ fn errors_exit_with_1() {
 }
 
 #[test]
+fn generate_accepts_extra_builds_in_hex_or_decimal() {
+    let output = imping(&[
+        "generate",
+        &fixture(),
+        "--accept-build",
+        "game.exe=0x64b8f2a1:0xa3c000",
+        "--accept-build",
+        "game.exe=1:4096",
+    ]);
+    assert!(output.status.success(), "{output:?}");
+    let source = text(&output.stdout);
+    assert!(source.contains("image_size: 0xa3c000"));
+    assert!(source.contains("timestamp: 0x1,"));
+    assert!(source.contains("image_size: 0x1000"));
+}
+
+#[test]
 fn usage_errors_exit_with_1() {
     let output = imping(&["generate", &fixture(), "--module-name", "no-equals-sign"]);
     assert_eq!(output.status.code(), Some(1));
     assert!(text(&output.stderr).contains("expected `<IR module>=<Rust module>`"));
+
+    let output = imping(&[
+        "generate",
+        &fixture(),
+        "--accept-build",
+        "game.exe=0x64b8f2a1",
+    ]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(text(&output.stderr).contains("expected `<IR module>=<timestamp>:<image size>`"));
 
     let output = imping(&["frobnicate"]);
     assert_eq!(output.status.code(), Some(1));

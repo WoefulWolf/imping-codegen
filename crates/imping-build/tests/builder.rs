@@ -63,6 +63,18 @@ fn module_names_reach_the_generator() {
 }
 
 #[test]
+fn accepted_builds_reach_the_generator() {
+    let out = scratch("accept_build").join("bindings.rs");
+    Builder::new(fixture())
+        .accept_build("game.exe", 0x64b8f2a1, 0xa3c000)
+        .generate_to(&out)
+        .expect("generate");
+    let text = std::fs::read_to_string(&out).expect("read output");
+    assert!(text.contains("image_size: 0xa2b000"), "the IR's build");
+    assert!(text.contains("image_size: 0xa3c000"), "the extra build");
+}
+
+#[test]
 fn errors_name_the_file_involved() {
     let dir = scratch("errors");
     let out = dir.join("bindings.rs");
