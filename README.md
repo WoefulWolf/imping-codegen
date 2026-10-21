@@ -31,6 +31,8 @@ The generated code depends on the `imping-runtime` crate.
 
 Status: early development. Not published.
 
+API docs: https://woefulwolf.github.io/imping-codegen/
+
 ## Development
 
 The crates fetch `imping-ir` (and, for tests, `imping-runtime`) from GitHub, or use the local checkouts inside a clone of the [imping](https://github.com/WoefulWolf/imping) repository.
