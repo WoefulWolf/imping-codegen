@@ -9,6 +9,10 @@ authors.workspace = true
 repository.workspace = true
 publish = false
 
+# Test-only, so it stays out of the docs.
+[lib]
+doc = false
+
 [dependencies]
 imping-runtime.workspace = true
 
