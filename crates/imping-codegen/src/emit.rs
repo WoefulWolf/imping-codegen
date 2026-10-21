@@ -119,13 +119,17 @@ fn identity(module: &Module, extra_builds: &[(u32, u32)], architecture: &str) ->
     ]);
     let any_build_doc = docs(&[
         format!(
-            "Finds `{file}` in this process and initializes it whatever build it is, returning              the build found; for trying a build these bindings don't accept. `init` is the              checked way in."
+            "Finds `{file}` in this process and initializes it whatever build it is, returning \
+             the build found; for trying a build these bindings don't accept. `init` is the \
+             checked way in."
         ),
         "# Errors".to_owned(),
         format!("Fails if `{file}` is not loaded; see `imping_runtime::Module::init_any_build`."),
         "# Safety".to_owned(),
         format!(
-            "Everything done through this module must be correct for the build of `{file}`              that is loaded, which nothing has checked. Each `hook` still compares the              function's first bytes where the IR has them; calls and globals are used as they are."
+            "Everything done through this module must be correct for the build of `{file}` \
+             that is loaded, which nothing has checked. Each `hook` still compares the \
+             function's first bytes where the IR has them; calls and globals are used as they are."
         ),
     ]);
     let (target_arch, label) = match module.architecture {

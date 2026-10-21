@@ -38,7 +38,7 @@ pub mod game32 {
         unsafe { MODULE.init() }
     }
 
-    /// Finds `Game32.exe` in this process and initializes it whatever build it is, returning              the build found; for trying a build these bindings don't accept. `init` is the              checked way in.
+    /// Finds `Game32.exe` in this process and initializes it whatever build it is, returning the build found; for trying a build these bindings don't accept. `init` is the checked way in.
     ///
     /// # Errors
     ///
@@ -46,7 +46,7 @@ pub mod game32 {
     ///
     /// # Safety
     ///
-    /// Everything done through this module must be correct for the build of `Game32.exe`              that is loaded, which nothing has checked. Each `hook` still compares the              function's first bytes where the IR has them; calls and globals are used as they are.
+    /// Everything done through this module must be correct for the build of `Game32.exe` that is loaded, which nothing has checked. Each `hook` still compares the function's first bytes where the IR has them; calls and globals are used as they are.
     pub unsafe fn init_any_build() -> ::core::result::Result<
         ::imping_runtime::Build,
         ::imping_runtime::Error,

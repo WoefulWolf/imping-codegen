@@ -90,6 +90,22 @@ fn output_is_deterministic() {
 }
 
 #[test]
+fn doc_text_has_no_runs_of_spaces() {
+    for fixture in ["types.json", "x86.json"] {
+        let source = Generator::new()
+            .generate(&load(fixture))
+            .unwrap()
+            .into_source();
+        for line in source.lines() {
+            let line = line.trim_start();
+            if let Some(text) = line.strip_prefix("///").or(line.strip_prefix("//!")) {
+                assert!(!text.trim().contains("  "), "{fixture}: {line}");
+            }
+        }
+    }
+}
+
+#[test]
 fn module_name_overrides_the_derived_name() {
     let ir = load("x86.json");
     let derived = Generator::new().generate(&ir).unwrap();

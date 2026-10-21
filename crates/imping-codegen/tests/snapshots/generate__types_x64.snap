@@ -38,7 +38,7 @@ pub mod game {
         unsafe { MODULE.init() }
     }
 
-    /// Finds `game.exe` in this process and initializes it whatever build it is, returning              the build found; for trying a build these bindings don't accept. `init` is the              checked way in.
+    /// Finds `game.exe` in this process and initializes it whatever build it is, returning the build found; for trying a build these bindings don't accept. `init` is the checked way in.
     ///
     /// # Errors
     ///
@@ -46,7 +46,7 @@ pub mod game {
     ///
     /// # Safety
     ///
-    /// Everything done through this module must be correct for the build of `game.exe`              that is loaded, which nothing has checked. Each `hook` still compares the              function's first bytes where the IR has them; calls and globals are used as they are.
+    /// Everything done through this module must be correct for the build of `game.exe` that is loaded, which nothing has checked. Each `hook` still compares the function's first bytes where the IR has them; calls and globals are used as they are.
     pub unsafe fn init_any_build() -> ::core::result::Result<
         ::imping_runtime::Build,
         ::imping_runtime::Error,
