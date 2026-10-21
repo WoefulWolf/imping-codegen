@@ -10,10 +10,9 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [workspace.dependencies]
-# Sibling imping repos, by relative path.
-imping-ir = { path = "../imping-ir" }
+imping-ir = { git = "https://github.com/WoefulWolf/imping-ir" }
 # Only codegen-fixture uses it, since the generated code depends on it.
-imping-runtime = { path = "../imping-runtime" }
+imping-runtime = { git = "https://github.com/WoefulWolf/imping-runtime" }
 imping-codegen = { path = "crates/imping-codegen" }
 
 [workspace.lints.rust]

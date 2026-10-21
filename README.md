@@ -33,7 +33,7 @@ Status: early development. Not published.
 
 ## Development
 
-The crates depend on the sibling `imping-ir` repository by relative path, so check it out next to this one.
+The crates fetch `imping-ir` (and, for tests, `imping-runtime`) from GitHub, or use the local checkouts inside a clone of the [imping](https://github.com/WoefulWolf/imping) repository.
 
 `crates/codegen-fixture` is a test-only crate: its build script generates bindings from `imping-codegen`'s x64 test fixture, and its tests compile and exercise them. Snapshot tests use [insta](https://insta.rs); after an intended change to the output, review the new snapshots and accept them (for example with `cargo insta review`, or by running the tests with `INSTA_UPDATE=always`).
 
