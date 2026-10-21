@@ -1,38 +1,10 @@
-//! Rust code generation from IR for the imping modding suite.
+//! Generates Rust bindings from imping IR.
 //!
-//! Turns an [`imping_ir::Ir`] into Rust source, one `pub mod` per IR module.
-//! The generated code depends only on the `imping-runtime` crate.
+//! [`Generator`] turns an [`imping_ir::Ir`] into formatted Rust source, one
+//! `pub mod` per IR module, and returns it as [`Bindings`] with any
+//! [`Warning`]s. The generated code depends only on `imping-runtime`.
 //!
-//! - Each module gets a `MODULE` identity and an `init()` that checks the
-//!   running build against it.
-//! - Types, functions and globals are emitted in one module per namespace
-//!   (`game::hw::cVec4` for the type `Hw::cVec4`).
-//! - Structs become `#[repr(C)]` structs with explicit padding, bitfield
-//!   accessors and compile-time assertions on size, alignment and every field
-//!   offset; unions get the same assertions.
-//! - A struct whose IR field is marked as its base class (a struct at offset
-//!   0) derefs to that base and implements `imping_runtime::Inherits` for it
-//!   and the base's own bases, so `upcast()` turns pointers into base
-//!   pointers.
-//! - Enums become integer newtypes with associated constants.
-//! - Typedefs become type aliases, and opaque types become byte arrays or
-//!   zero-sized markers.
-//! - Functions become an `unsafe fn` plus a module of the same name with the
-//!   function's `RVA`, `Signature`, `ptr()` and `hook()`, inside one module per
-//!   namespace. A hook's closure receives the function's `Original` first:
-//!   `original.forward()` safely makes the call the target was making. A
-//!   parameter named like a static or enum type in its module gets a trailing
-//!   `_`.
-//! - Functions with the function tag `imping-safe` get a safe `fn` instead,
-//!   whose pointer parameters are references, unless a parameter has no safe
-//!   form (a [`Warning`] says so). The tag means: with valid arguments the
-//!   function is always fine to call, and it keeps none of its pointer
-//!   arguments after returning.
-//! - Globals become `imping_runtime::Global` statics. Structs, unions and enums
-//!   whose every bit pattern is valid implement `imping_runtime::Plain`, which
-//!   makes their globals safe to read and write.
-//!
-//! # Example
+//! # Examples
 //!
 //! ```
 //! let ir = imping_ir::Ir::from_json_str(r#"{
@@ -57,6 +29,33 @@
 //! assert!(bindings.warnings().is_empty());
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
+//!
+//! # Generated code
+//!
+//! - Each module gets a `MODULE` identity and an `init()` that checks the
+//!   running build against it.
+//! - Types, functions and globals go in one module per namespace
+//!   (`game::hw::cVec4` for the type `Hw::cVec4`).
+//! - Structs become `#[repr(C)]` with explicit padding, bitfield accessors and
+//!   compile-time checks on size, alignment and every field offset; unions get
+//!   the same checks.
+//! - A struct whose IR field is marked as its base class (a struct at offset
+//!   0) derefs to that base and implements `imping_runtime::Inherits` for it
+//!   and the base's own bases, so `upcast()` turns pointers into base pointers.
+//! - Enums become integer newtypes with associated constants, typedefs become
+//!   type aliases, and opaque types become byte arrays or zero-sized markers.
+//! - Functions become an `unsafe fn` plus a module of the same name with the
+//!   function's `RVA`, `Signature`, `ptr()` and `hook()`. A hook's closure gets
+//!   the function's `Original` first; `original.forward()` safely makes the
+//!   call the target was making. A parameter named like a static or enum type
+//!   in its module gets a trailing `_`.
+//! - Functions tagged `imping-safe` get a safe `fn` whose pointer parameters
+//!   are references, unless a parameter has no safe form (a [`Warning`] says
+//!   so). The tag means the function is always fine to call with valid
+//!   arguments and keeps none of its pointer arguments after returning.
+//! - Globals become `imping_runtime::Global` statics. Structs, unions and enums
+//!   whose every bit pattern is valid implement `imping_runtime::Plain`, which
+//!   makes their globals safe to read and write.
 
 mod emit;
 mod error;
@@ -76,6 +75,14 @@ use std::collections::HashMap;
 ///
 /// Create one with [`Generator::new`], optionally configure it, then call
 /// [`generate`](Self::generate).
+///
+/// # Examples
+///
+/// ```
+/// let generator = imping_codegen::Generator::new()
+///     .module_name("GameAssembly.dll", "game")
+///     .accept_build("GameAssembly.dll", 0x64b8f2a1, 0xa3c000);
+/// ```
 #[derive(Debug, Clone, Default)]
 pub struct Generator {
     /// IR module name -> Rust module name overrides, in call order.
@@ -92,32 +99,21 @@ impl Generator {
 
     /// Names the Rust module generated for the IR module `ir_name`.
     ///
-    /// By default the name is derived from the IR module's file name: the
-    /// extension is dropped and the rest converted to snake case, so
-    /// `GameAssembly.dll` becomes `game_assembly`. If the same `ir_name` is
-    /// given more than once, the last call wins.
-    ///
-    /// ```
-    /// let generator = imping_codegen::Generator::new().module_name("GameAssembly.dll", "game");
-    /// ```
+    /// By default it's the IR module's file name without the extension, in
+    /// snake case: `GameAssembly.dll` becomes `game_assembly`. If the same
+    /// `ir_name` is given more than once, the last call wins.
     pub fn module_name(mut self, ir_name: impl Into<String>, rust_name: impl Into<String>) -> Self {
         self.module_names.push((ir_name.into(), rust_name.into()));
         self
     }
 
     /// Makes the generated `init()` of the IR module `ir_name` also accept the
-    /// build with this timestamp and image size, besides the build the IR was
-    /// made from.
+    /// build with this timestamp and image size.
     ///
-    /// For the same code in a different image, such as an executable wrapped by
-    /// a packer or DRM layer that keeps the timestamp but grows the image. The
-    /// generated bindings promise the IR describes every build they accept, so
+    /// Meant for the same code in a different image, such as an executable
+    /// wrapped by a packer or DRM layer that keeps the timestamp but grows the
+    /// image. The bindings promise the IR describes every build they accept, so
     /// only add builds whose code and data match the analysed one.
-    ///
-    /// ```
-    /// let generator = imping_codegen::Generator::new()
-    ///     .accept_build("game.exe", 0x64b8f2a1, 0xa3c000);
-    /// ```
     pub fn accept_build(
         mut self,
         ir_name: impl Into<String>,
@@ -131,8 +127,8 @@ impl Generator {
 
     /// Generates the bindings for every module in `ir`.
     ///
-    /// The IR is validated first. Anything the generator can't represent is
-    /// reported as a [`Warning`] rather than failing generation.
+    /// Validates the IR first. Anything the generator can't represent becomes
+    /// a [`Warning`] instead of an error.
     ///
     /// # Errors
     ///
@@ -141,8 +137,8 @@ impl Generator {
     ///   [`accept_build`](Self::accept_build) names a module that isn't in `ir`.
     /// - [`Error::InvalidModuleName`] if a [`module_name`](Self::module_name)
     ///   isn't a valid Rust module name.
-    /// - [`Error::ModuleNameClash`] if two IR modules would get the same Rust
-    ///   module name.
+    /// - [`Error::ModuleNameClash`] if two IR modules get the same Rust module
+    ///   name.
     pub fn generate(&self, ir: &Ir) -> Result<Bindings, Error> {
         ir.validate().map_err(Error::InvalidIr)?;
 
@@ -209,8 +205,7 @@ impl Generator {
     }
 }
 
-/// Generated bindings: Rust source plus the warnings raised while generating
-/// it.
+/// Generated Rust source plus the warnings raised while generating it.
 ///
 /// Returned by [`Generator::generate`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -220,17 +215,18 @@ pub struct Bindings {
 }
 
 impl Bindings {
-    /// The generated Rust source, formatted.
+    /// Returns the generated Rust source, formatted.
     pub fn source(&self) -> &str {
         &self.source
     }
 
-    /// Consumes the bindings, returning the generated Rust source.
+    /// Consumes the bindings and returns the generated Rust source.
     pub fn into_source(self) -> String {
         self.source
     }
 
-    /// Everything the generator skipped or simplified, in the order found.
+    /// Returns everything the generator skipped or simplified, in the order
+    /// found.
     pub fn warnings(&self) -> &[Warning] {
         &self.warnings
     }

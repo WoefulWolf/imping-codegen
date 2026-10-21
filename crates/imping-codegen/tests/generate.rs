@@ -1,7 +1,6 @@
-//! Generation from fixture IR: snapshots of the output, warnings and errors.
+//! Tests generation from fixture IR: output snapshots, warnings and errors.
 //!
-//! The x64 output is also compiled and exercised by the `codegen-fixture`
-//! crate in this workspace.
+//! The `codegen-fixture` crate also compiles and runs the x64 output.
 
 use imping_codegen::{Error, Generator, Warning};
 use imping_ir::Ir;
@@ -12,7 +11,7 @@ fn load(name: &str) -> Ir {
     Ir::from_json_str(&text).unwrap_or_else(|e| panic!("parsing {path}: {e}"))
 }
 
-/// A one-module x64 IR with the given types JSON.
+/// Returns a one-module x64 IR with the given types JSON.
 fn module_with_types(name: &str, types: &str) -> Ir {
     Ir::from_json_str(&format!(
         r#"{{

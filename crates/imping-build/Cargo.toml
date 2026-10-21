@@ -10,14 +10,12 @@ publish.workspace = true
 [dependencies]
 imping-ir.workspace = true
 imping-codegen.workspace = true
-# The `imping` command line, only with the `cli` feature, so build scripts
-# never compile it.
+# Optional so build scripts never compile it.
 clap = { version = "4", features = ["derive"], optional = true }
 
 [features]
 default = []
-# Builds the `imping` command-line tool:
-# `cargo install --path crates/imping-build --features cli`.
+# The `imping` CLI: `cargo install --path crates/imping-build --features cli`.
 cli = ["dep:clap"]
 
 [[bin]]

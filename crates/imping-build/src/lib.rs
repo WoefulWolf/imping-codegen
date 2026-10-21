@@ -1,8 +1,8 @@
-//! Build-script helper and command-line tool that generate Rust bindings for
-//! the imping modding suite.
+//! Generates Rust bindings from imping IR files, from a build script or the
+//! command line.
 //!
 //! [`Builder`] reads an IR file, generates bindings with `imping-codegen` and
-//! writes them, from a `build.rs` or anywhere else.
+//! writes them. Failures are an [`Error`] naming the file involved.
 //!
 //! # From a build script
 //!
@@ -13,8 +13,7 @@
 //! }
 //! ```
 //!
-//! [`Builder::generate`] writes `$OUT_DIR/imped.rs`, which the crate then
-//! includes:
+//! [`Builder::generate`] writes `$OUT_DIR/imped.rs` for the crate to include:
 //!
 //! ```ignore
 //! include!(concat!(env!("OUT_DIR"), "/imped.rs"));
@@ -51,6 +50,18 @@ const DEFAULT_OUT_FILE: &str = "imped.rs";
 /// Create one with [`Builder::new`], optionally configure it, then call
 /// [`generate`](Self::generate) from a build script or
 /// [`generate_to`](Self::generate_to) anywhere else.
+///
+/// # Examples
+///
+/// ```no_run
+/// // build.rs, for a packed `game.exe` that keeps its timestamp but grows
+/// // the image.
+/// fn main() -> Result<(), imping_build::Error> {
+///     imping_build::Builder::new("ir/game.json")
+///         .accept_build("game.exe", 0x64b8f2a1, 0xa3c000)
+///         .generate()
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct Builder {
     ir_path: PathBuf,
@@ -59,7 +70,7 @@ pub struct Builder {
 }
 
 impl Builder {
-    /// A builder for the IR file at `ir_path`.
+    /// Creates a builder for the IR file at `ir_path`.
     ///
     /// In a build script, a relative path is relative to the crate's root.
     pub fn new(ir_path: impl Into<PathBuf>) -> Self {
@@ -70,27 +81,18 @@ impl Builder {
         }
     }
 
-    /// Names the Rust module generated for the IR module `ir_name`, instead of
-    /// the name derived from its file name. See
-    /// [`imping_codegen::Generator::module_name`].
+    /// Names the Rust module generated for the IR module `ir_name`.
+    ///
+    /// See [`imping_codegen::Generator::module_name`] for the default name.
     pub fn module_name(mut self, ir_name: impl Into<String>, rust_name: impl Into<String>) -> Self {
         self.generator = self.generator.module_name(ir_name, rust_name);
         self
     }
 
     /// Makes the generated `init()` of the IR module `ir_name` also accept the
-    /// build with this timestamp and image size, besides the build the IR was
-    /// made from. See [`imping_codegen::Generator::accept_build`].
+    /// build with this timestamp and image size.
     ///
-    /// ```no_run
-    /// // build.rs: the shipped game.exe is wrapped by a packer that keeps the
-    /// // timestamp but grows the image.
-    /// fn main() -> Result<(), imping_build::Error> {
-    ///     imping_build::Builder::new("ir/game.json")
-    ///         .accept_build("game.exe", 0x64b8f2a1, 0xa3c000)
-    ///         .generate()
-    /// }
-    /// ```
+    /// See [`imping_codegen::Generator::accept_build`] for when that's sound.
     pub fn accept_build(
         mut self,
         ir_name: impl Into<String>,
@@ -101,20 +103,20 @@ impl Builder {
         self
     }
 
-    /// Names the file [`generate`](Self::generate) writes in `OUT_DIR`;
-    /// `imped.rs` by default. Use it to keep the bindings of several IR files
-    /// apart.
+    /// Sets the file name [`generate`](Self::generate) writes in `OUT_DIR`,
+    /// `imped.rs` by default.
+    ///
+    /// Use it to keep the bindings of several IR files apart.
     pub fn out_file(mut self, name: impl Into<PathBuf>) -> Self {
         self.out_file = name.into();
         self
     }
 
-    /// Generates the bindings into `$OUT_DIR/imped.rs` (or the name set with
-    /// [`out_file`](Self::out_file)), for use from a build script.
+    /// Generates the bindings into `$OUT_DIR/imped.rs`, or the name set with
+    /// [`out_file`](Self::out_file).
     ///
-    /// Also prints `cargo:rerun-if-changed` for the IR file, so the bindings
-    /// are regenerated when it changes, and one `cargo:warning` per
-    /// [`Warning`].
+    /// For build scripts: also prints `cargo:rerun-if-changed` for the IR file
+    /// and one `cargo:warning` per [`Warning`].
     ///
     /// # Errors
     ///
@@ -130,8 +132,8 @@ impl Builder {
         Ok(())
     }
 
-    /// Generates the bindings into the file at `path`, without printing
-    /// anything, and returns the warnings.
+    /// Generates the bindings into the file at `path` and returns the
+    /// warnings, without printing anything.
     ///
     /// # Errors
     ///

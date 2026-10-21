@@ -1,10 +1,10 @@
-//! Emitting functions and globals, grouped into one module per namespace.
+//! Emits functions and globals, one module per namespace.
 //!
 //! Each function becomes an `unsafe fn` plus a module of the same name holding
 //! its `RVA`, `VERIFICATION`, `Signature`, `ptr()` and `hook()`. Types are
-//! named through explicit `super::` paths rather than glob imports, so an item
-//! in a namespace module (such as a constructor `Entity::Entity`) can never
-//! shadow the type it refers to.
+//! named through explicit `super::` paths, not glob imports, so an item in a
+//! namespace module (such as a constructor `Entity::Entity`) can't shadow the
+//! type it refers to.
 
 use crate::Warning;
 use crate::emit::{doc, docs, hex, qualified};
@@ -17,8 +17,8 @@ use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use std::collections::{HashMap, HashSet};
 
-/// The most parameters a hookable function may have; the hooking engine
-/// supports up to 14.
+/// The most parameters a hookable function may have, the hooking engine's
+/// limit.
 const MAX_HOOK_PARAMETERS: usize = 14;
 
 /// The items of a function's own module that its parameters could clash with
@@ -27,17 +27,18 @@ const MAX_HOOK_PARAMETERS: usize = 14;
 const FUNCTION_MODULE_VALUES: &[&str] = &["RVA", "VERIFICATION", "SLOT", "Original"];
 
 /// The function tag that marks a function as safe to call with valid
-/// arguments: it has no other preconditions (any time, any thread) and does
-/// not keep its pointer arguments after returning. Such functions get a safe
-/// call wrapper whose pointer parameters are references.
+/// arguments.
+///
+/// Such a function has no other preconditions (any time, any thread) and keeps
+/// none of its pointer arguments, so it gets a safe wrapper taking references.
 pub(crate) const SAFE_TAG: &str = "imping-safe";
 
-/// Adds a module's functions and globals to the namespace tree `root`, whose
-/// modules are already named and hold the types, and returns the whole tree:
-/// the root's items, then one `pub mod` per top-level namespace.
+/// Adds a module's functions and globals to the namespace tree `root` and
+/// returns the whole tree as tokens.
 ///
-/// Within each scope, functions claim names in RVA order (so the first of an
-/// overload set keeps the plain name), then globals.
+/// `root`'s modules must already be named and hold the types. In each scope,
+/// functions claim names in RVA order (so the first overload keeps the plain
+/// name), then globals.
 pub(crate) fn emit(
     table: &TypeTable<'_>,
     layouts: &Layouts,
@@ -65,8 +66,8 @@ pub(crate) fn emit(
         })
         .collect();
 
-    // The names a parameter can't take in each namespace module: statics and
-    // tuple structs, which a parameter name would be read as a pattern for.
+    // Statics and tuple structs per namespace: a parameter with one of these
+    // names would be read as a pattern.
     let mut values: HashMap<&[String], HashSet<&str>> = HashMap::new();
     values.entry(&[]).or_default().insert("MODULE");
     for (global, name) in module.globals.iter().zip(&global_names) {
@@ -94,8 +95,8 @@ pub(crate) fn emit(
     root.into_tokens()
 }
 
-/// `super::` repeated `depth` times: the path from a module `depth` levels
-/// below the bindings' module root back to it.
+/// Returns `super::` repeated `depth` times, the path from a module `depth`
+/// levels below the bindings' root back to it.
 fn supers(depth: usize) -> TokenStream {
     let supers = (0..depth).map(|_| quote! { super:: });
     quote! { #(#supers)* }
@@ -112,8 +113,9 @@ struct Parameter {
     source: String,
 }
 
-/// Whether a type can be passed or returned by value. Arrays and function
-/// types decay to pointers, as in C.
+/// Returns whether a type can be passed or returned by value.
+///
+/// Arrays and function types decay to pointers, as in C.
 fn by_value(table: &TypeTable<'_>, layouts: &Layouts, id: TypeId) -> bool {
     match table.peel(id).map(|def| &def.kind) {
         Some(TypeKind::Array { .. } | TypeKind::Function { .. }) => true,
@@ -121,8 +123,8 @@ fn by_value(table: &TypeTable<'_>, layouts: &Layouts, id: TypeId) -> bool {
     }
 }
 
-/// A parameter or return type, with arrays decayed to pointers (text arrays
-/// to the runtime's string pointers).
+/// Returns a parameter or return type, with arrays decayed to pointers (text
+/// arrays to the runtime's string pointers).
 fn value_type(table: &TypeTable<'_>, id: TypeId, depth: usize) -> TokenStream {
     match table.peel(id).map(|def| &def.kind) {
         Some(TypeKind::Array { element, .. }) => match table.text_kind(*element) {
@@ -143,10 +145,12 @@ struct SafeParameter {
     argument: TokenStream,
 }
 
-/// The safe form of a parameter of a function tagged [`SAFE_TAG`], or why it
-/// has none. Data pointers become references (text pointers `&CStr` or
-/// `&WString`); by-value parameters must contain no data pointers, since safe
-/// code could put any address in them.
+/// Returns the safe form of a parameter of a function tagged [`SAFE_TAG`], or
+/// why it has none.
+///
+/// Data pointers become references (text pointers `&CStr` or `&WString`).
+/// By-value parameters must hold no data pointers, since safe code could put
+/// any address in them.
 fn safe_parameter(
     table: &TypeTable<'_>,
     layouts: &Layouts,
@@ -220,12 +224,12 @@ fn safe_parameter(
     }
 }
 
-/// The function's parameters, or why one can't be passed. A `void`
-/// parameter means "no parameters", as in C, and is dropped.
+/// Returns the function's parameters, or why one can't be passed.
 ///
-/// A parameter named like a static or tuple struct in its scope (`taken` in
-/// the namespace module, [`FUNCTION_MODULE_VALUES`] in the function's module)
-/// gets a trailing `_`, since Rust would read the name as a pattern for it.
+/// A `void` parameter means "no parameters", as in C, and is dropped. A name
+/// that clashes with a static or tuple struct in scope (`taken`, or
+/// [`FUNCTION_MODULE_VALUES`]) gets a trailing `_`, so it isn't read as a
+/// pattern.
 fn parameters(
     table: &TypeTable<'_>,
     layouts: &Layouts,
@@ -498,8 +502,8 @@ fn emit_function(
     }
 }
 
-/// The closure slot, thunk and `hook()` of a hookable function, inside its
-/// module.
+/// Returns the closure slot, thunk and `hook()` of a hookable function, for
+/// its module.
 fn hook_items(
     parameters: &[Parameter],
     output: &Option<TokenStream>,

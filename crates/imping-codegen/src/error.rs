@@ -1,4 +1,4 @@
-//! The error and warning types.
+//! Error and warning types.
 
 use core::fmt;
 use imping_ir::ValidationErrors;
@@ -68,12 +68,12 @@ impl core::error::Error for Error {
 
 /// Something the generator skipped or simplified.
 ///
-/// Warnings never stop generation; the rest of the bindings are still
-/// produced. Their [`Display`](fmt::Display) names the module and item.
+/// Warnings never stop generation. Their [`Display`](fmt::Display) names the
+/// module and item.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Warning {
-    /// A vtable was skipped; vtables are not supported yet.
+    /// A vtable was skipped, since vtables aren't supported.
     VtableSkipped {
         /// The IR module the vtable is in.
         module: String,
@@ -108,8 +108,7 @@ pub enum Warning {
     },
     /// A function can be called but not hooked, so it has no `hook`.
     ///
-    /// Variadic functions are not reported: having no hook is part of their
-    /// design.
+    /// Not raised for variadic functions, which never get a hook.
     HookUnavailable {
         /// The IR module the function is in.
         module: String,

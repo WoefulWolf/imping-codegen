@@ -1,4 +1,4 @@
-//! The `imping` command-line tool, run as a separate process.
+//! Tests the `imping` command-line tool, run as a separate process.
 
 #![cfg(feature = "cli")]
 

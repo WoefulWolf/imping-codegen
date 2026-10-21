@@ -1,9 +1,9 @@
 //! The namespace tree: one Rust module per IR namespace, holding the types,
 //! functions and globals of that namespace.
 //!
-//! Every namespace is registered before any module is named, so names can be
-//! claimed in a fixed order within each scope: the namespace's types first,
-//! then its child modules, then its functions and globals.
+//! All namespaces are registered before any module is named, so each scope
+//! claims names in a fixed order: types, then child modules, then functions
+//! and globals.
 
 use crate::emit::doc;
 use crate::names::{self, Scope, doc_name, ident};
@@ -24,7 +24,7 @@ pub(crate) struct Namespace {
 }
 
 impl Namespace {
-    /// The bindings' module root, with `scope` as its scope.
+    /// Creates the bindings' module root, with `scope` as its scope.
     pub(crate) fn root(scope: Scope) -> Self {
         Self::new(String::new(), scope)
     }
@@ -41,7 +41,9 @@ impl Namespace {
     }
 
     /// Registers the namespace at `path` below this one, and any namespaces
-    /// leading to it. Children keep the order of their first registration.
+    /// leading to it.
+    ///
+    /// Children keep the order of their first registration.
     pub(crate) fn register(&mut self, path: &[String]) {
         let Some((first, rest)) = path.split_first() else {
             return;
@@ -69,11 +71,11 @@ impl Namespace {
         }
     }
 
-    /// The registered namespace at `path` below this one.
+    /// Returns the registered namespace at `path` below this one.
     ///
     /// # Panics
     ///
-    /// If `path` was never registered, which is an internal error.
+    /// If `path` was never registered, which is a bug.
     pub(crate) fn at(&mut self, path: &[String]) -> &mut Namespace {
         let Some((first, rest)) = path.split_first() else {
             return self;
@@ -85,11 +87,12 @@ impl Namespace {
         self.children[index].at(rest)
     }
 
-    /// The Rust module names leading from this namespace to the one at `path`.
+    /// Returns the Rust module names leading from here to the namespace at
+    /// `path`.
     ///
     /// # Panics
     ///
-    /// If `path` was never registered, which is an internal error.
+    /// If `path` was never registered, which is a bug.
     pub(crate) fn module_path(&self, path: &[String]) -> Vec<String> {
         let mut modules = Vec::with_capacity(path.len());
         let mut current = self;
@@ -104,7 +107,7 @@ impl Namespace {
         modules
     }
 
-    /// The root's items followed by one `pub mod` per child namespace.
+    /// Returns the root's items followed by one `pub mod` per child namespace.
     pub(crate) fn into_tokens(self) -> TokenStream {
         let items = self.items;
         let children = self
@@ -117,7 +120,7 @@ impl Namespace {
         }
     }
 
-    /// The namespace as a `pub mod`, below the namespace `parent`.
+    /// Returns the namespace as a `pub mod` below the namespace `parent`.
     fn into_module(self, parent: &[String]) -> TokenStream {
         let mut path = parent.to_vec();
         path.push(self.ir_name);

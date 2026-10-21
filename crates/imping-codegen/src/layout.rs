@@ -1,5 +1,5 @@
-//! Layout planning: the size and alignment Rust will give each type, and how
-//! each struct and union is laid out (padding, bitfield storage, `packed` or
+//! Plans layouts: the size and alignment Rust gives each type, and how each
+//! struct and union is laid out (padding, bitfield storage, `packed` or
 //! `align(N)`), or why it can't be.
 
 use crate::types::{Integer, TypeTable};
@@ -136,22 +136,23 @@ impl Layouts {
         }
     }
 
-    /// The layout of a type, or `None` if it has no size and so can't be used
-    /// by value.
+    /// Returns the layout of a type, or `None` if it has no size and can't be
+    /// used by value.
     pub(crate) fn layout(&self, id: TypeId) -> Option<Layout> {
         self.layouts.get(&id.0).copied().flatten()
     }
 
-    /// The plan for a struct or union.
+    /// Returns the plan for a struct or union.
     pub(crate) fn get(&self, id: TypeId) -> &Plan {
         self.plans
             .get(&id.0)
             .unwrap_or_else(|| panic!("type id {} has no layout plan", id.0))
     }
 
-    /// Whether the Rust type generated for `id` is plain data: every bit
-    /// pattern of it is a valid value, so it implements the runtime's `Plain`.
-    /// `bool`, `void`, function pointers and unsized opaque types are not.
+    /// Returns whether the Rust type for `id` is plain data, valid for every
+    /// bit pattern, so it implements the runtime's `Plain`.
+    ///
+    /// `bool`, `void`, function pointers and unsized opaque types aren't.
     pub(crate) fn is_plain(&self, table: &TypeTable<'_>, id: TypeId) -> bool {
         self.plain_within(table, id, 64)
     }
@@ -211,8 +212,8 @@ struct Pending<'f> {
 }
 
 impl Planner<'_, '_> {
-    /// The layout of a type, or `None` if it has no size (`void`, function
-    /// types, opaque types of unknown size, by-value cycles).
+    /// Returns the layout of a type, or `None` if it has no size (`void`,
+    /// function types, opaque types of unknown size, by-value cycles).
     fn layout(&mut self, id: TypeId) -> Option<Layout> {
         if let Some(layout) = self.memo.get(&id.0) {
             return *layout;
@@ -510,8 +511,8 @@ impl Planner<'_, '_> {
         }
     }
 
-    /// What a bitfield of the given declared type reads and writes, if it can
-    /// be a bitfield at all.
+    /// Returns what a bitfield of this declared type reads and writes, or
+    /// `None` if it can't be a bitfield.
     fn bit_kind(&self, id: TypeId) -> Option<BitKind> {
         let def = self.table.peel(id)?;
         match def.kind {
@@ -530,7 +531,7 @@ impl Planner<'_, '_> {
     }
 }
 
-/// A type whose alignment equals its size.
+/// Returns the layout of a type whose alignment equals its size.
 fn plain(size: u64) -> Layout {
     Layout {
         size,

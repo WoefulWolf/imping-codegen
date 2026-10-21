@@ -1,5 +1,6 @@
-//! The `imping` command-line tool. Not a supported API: it is public only so
-//! the `imping` binary can call it.
+//! The `imping` command-line tool.
+//!
+//! Not a supported API; it's public only so the `imping` binary can call it.
 
 use crate::{Builder, Error};
 use clap::{Parser, Subcommand};
@@ -76,7 +77,7 @@ fn parse_accept_build(value: &str) -> Result<(String, u32, u32), String> {
     }
 }
 
-/// A `u32` in decimal or `0x` hexadecimal.
+/// Parses a `u32` in decimal or `0x` hex.
 fn parse_u32(value: &str) -> Option<u32> {
     match value
         .strip_prefix("0x")
@@ -87,14 +88,15 @@ fn parse_u32(value: &str) -> Option<u32> {
     }
 }
 
-/// Runs the tool with the process's arguments. Exits with 0 on success
-/// (warnings included) and 1 on any error.
+/// Runs the tool with the process's arguments.
+///
+/// Exits with 0 on success, warnings included, and 1 on any error.
 pub fn main() -> ExitCode {
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
         Err(error) => {
             let _ = error.print();
-            // `--help` and `--version` also arrive here, and are successes.
+            // `--help` and `--version` land here too, and they're successes.
             return if error.use_stderr() {
                 ExitCode::FAILURE
             } else {

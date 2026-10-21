@@ -1,4 +1,4 @@
-//! Turning generated tokens into formatted source.
+//! Formats generated tokens as source text.
 
 use proc_macro2::TokenStream;
 
@@ -20,9 +20,9 @@ pub(crate) fn render(tokens: TokenStream) -> String {
 /// Inserts a blank line between consecutive items, which prettyplease runs
 /// together inside modules and impls.
 ///
-/// A line starts a new item when it is indented like the previous line and
-/// that line closed a block or a multi-line item (`}`, `};` or `);`) or was a
-/// one-line item (a type alias, tuple struct, static or assertion).
+/// A line starts a new item when it's indented like the previous line and that
+/// line closed a block or multi-line item (`}`, `};`, `);`) or was a one-line
+/// item (type alias, tuple struct, static or assertion).
 fn separate_items(source: &str) -> String {
     let mut out = String::with_capacity(source.len() + source.len() / 16);
     let mut previous: Option<&str> = None;

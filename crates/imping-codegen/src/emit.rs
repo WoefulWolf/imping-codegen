@@ -1,7 +1,7 @@
-//! Emitting Rust items for one IR module.
+//! Emits the Rust items for one IR module.
 //!
-//! Generated expressions only carry parentheses where precedence needs them,
-//! so the output triggers no `unused_parens` warnings in a user's build.
+//! Expressions only get parentheses where precedence needs them, so the output
+//! triggers no `unused_parens` warnings in a user's build.
 
 use crate::Warning;
 use crate::functions;
@@ -15,9 +15,10 @@ use quote::quote;
 use std::collections::HashSet;
 
 /// Emits the `pub mod` for one IR module: its identity and `init`, then its
-/// types, functions and globals, each in the module of its namespace.
-/// The bindings for one IR module. `extra_builds` are the builds (timestamp,
-/// image size) accepted besides the IR's own.
+/// types, functions and globals, each in its namespace's module.
+///
+/// `extra_builds` are the builds (timestamp, image size) accepted besides the
+/// IR's own.
 pub(crate) fn module(
     module: &Module,
     rust_name: &str,
@@ -28,8 +29,8 @@ pub(crate) fn module(
     scope.reserve("MODULE");
     scope.reserve("init");
     scope.reserve("init_any_build");
-    // Namespaces of functions and globals come first, so giving types
-    // namespaces never renames the modules functions and globals already use.
+    // Function and global namespaces go first, so type namespaces can't rename
+    // the modules they use.
     let mut root = Namespace::root(scope);
     for function in &module.functions {
         root.register(&function.namespace);
@@ -77,7 +78,7 @@ pub(crate) fn module(
     }
 }
 
-/// `MODULE`, `init()` and the compile-time check of the target architecture.
+/// Returns `MODULE`, `init()` and the compile-time target architecture check.
 fn identity(module: &Module, extra_builds: &[(u32, u32)], architecture: &str) -> TokenStream {
     let file = doc_name(&module.name);
     let name = Literal::string(&module.name);
@@ -212,8 +213,8 @@ fn type_item(
     Some(quote! { #item #plain })
 }
 
-/// `unsafe impl Plain` for a struct, union, enum or opaque type whose every
-/// bit pattern is a valid value, so `Global::read` and `write` are safe for it.
+/// Returns `unsafe impl Plain` for a struct, union, enum or opaque type valid
+/// for every bit pattern, which makes `Global::read` and `write` safe for it.
 fn plain_impl(table: &TypeTable<'_>, layouts: &Layouts, def: &TypeDef) -> Option<TokenStream> {
     let reason = match &def.kind {
         TypeKind::Enum { .. } => " SAFETY: a transparent wrapper of an integer.",
@@ -242,7 +243,7 @@ fn warn_opaque(table: &TypeTable<'_>, def: &TypeDef, reason: &str, warnings: &mu
     });
 }
 
-/// The source name of a type for its docs, with its namespace.
+/// Returns a type's source name with its namespace, for its docs.
 fn shown(table: &TypeTable<'_>, def: &TypeDef) -> String {
     doc_name(&table.source_name(def.id))
 }
@@ -257,9 +258,10 @@ fn typedef(table: &TypeTable<'_>, def: &TypeDef, target: TypeId) -> TokenStream 
     }
 }
 
-/// A struct's base class: its field the IR marks as the base, if that field
-/// is a struct at offset 0 and the struct is laid out without packing (a
-/// packed struct's base may sit at an address its type can't be aligned to).
+/// Returns the struct's base-class field: the one the IR marks as the base, if
+/// it's a struct at offset 0 and the struct isn't packed.
+///
+/// A packed struct's base may sit at an address its type can't be aligned to.
 /// Any other `base` mark is ignored.
 fn base_field<'a>(
     table: &TypeTable<'a>,
@@ -286,8 +288,8 @@ fn base_field<'a>(
     (field.offset == 0 && field.bits.is_none() && is_struct && emitted).then_some((index, field))
 }
 
-/// The base classes of a struct whose base field is `base`: the direct base
-/// first, then each base's own base, as written types (typedefs kept).
+/// Returns the base classes of a struct whose base field is `base`: the direct
+/// base first, then each base's own base, as written (typedefs kept).
 fn ancestors(table: &TypeTable<'_>, layouts: &Layouts, base: &Field) -> Vec<TypeId> {
     let mut chain = vec![base.type_id];
     let mut seen = HashSet::new();
@@ -420,8 +422,8 @@ fn structure(
     }
 }
 
-/// `Deref` and `DerefMut` to a struct's base field, and `Inherits` for each
-/// type in `chain`: the direct base first, then its bases in turn.
+/// Returns `Deref` and `DerefMut` to a struct's base field, and `Inherits` for
+/// each type in `chain`: the direct base first, then its bases in turn.
 fn inheritance(
     table: &TypeTable<'_>,
     name: &Ident,
@@ -588,9 +590,10 @@ fn enumeration(
     }
 }
 
-/// Fits an IR enum value into the underlying integer. A value that fits the
-/// other signedness of the same width wraps (two's complement, as C does);
-/// anything else is truncated, which the returned `bool` reports.
+/// Fits an IR enum value into the underlying integer.
+///
+/// A value that fits the other signedness of the same width wraps (two's
+/// complement, as in C); anything else is truncated, and the `bool` says so.
 fn enum_value(value: i64, integer: Integer) -> (i128, bool) {
     let bits = integer.bits;
     let value = i128::from(value);
@@ -618,7 +621,7 @@ fn enum_value(value: i64, integer: Integer) -> (i128, bool) {
     (wrapped, !fits_other_signedness)
 }
 
-/// A possibly negative integer literal.
+/// Returns a possibly negative integer literal.
 fn value_tokens(value: i128) -> TokenStream {
     let literal = Literal::u128_unsuffixed(value.unsigned_abs());
     if value < 0 {
@@ -628,8 +631,8 @@ fn value_tokens(value: i128) -> TokenStream {
     }
 }
 
-/// An opaque struct of `size` bytes: a struct or union whose layout can't be
-/// represented, or an IR opaque type of known size.
+/// Returns an opaque struct of `size` bytes, for a struct or union whose
+/// layout can't be represented or an IR opaque type of known size.
 fn opaque_bytes(
     table: &TypeTable<'_>,
     def: &TypeDef,
@@ -661,7 +664,8 @@ fn opaque_bytes(
     }
 }
 
-/// A zero-sized, `!Send`, `!Sync`, `!Unpin` type usable only behind pointers.
+/// Returns a zero-sized, `!Send`, `!Sync`, `!Unpin` type for use behind
+/// pointers only.
 fn opaque_marker(table: &TypeTable<'_>, def: &TypeDef, explanation: &str) -> TokenStream {
     let name = ident(table.name(def.id));
     let doc = doc(format!("`{}`: {explanation}", shown(table, def)));
@@ -708,7 +712,7 @@ impl Expr {
         }
     }
 
-    /// The expression as an operand: parenthesised if compound.
+    /// Returns the expression as an operand, parenthesised if compound.
     fn operand(&self) -> TokenStream {
         let tokens = &self.tokens;
         if self.compound {
@@ -779,13 +783,13 @@ impl BitAccessor<'_, '_> {
         }
     }
 
-    /// `self.<storage>`.
+    /// Returns `self.<storage>`.
     fn storage_value(&self) -> TokenStream {
         let field = self.storage_field;
         quote! { self.#field }
     }
 
-    /// The bitfield's mask, unshifted.
+    /// Returns the bitfield's mask, unshifted.
     fn mask(&self) -> u64 {
         if self.bit.width == 64 {
             u64::MAX
@@ -794,7 +798,7 @@ impl BitAccessor<'_, '_> {
         }
     }
 
-    /// The bitfield's bits, shifted down, in the unsigned storage type.
+    /// Returns the bitfield's bits, shifted down, in the unsigned storage type.
     fn raw(&self) -> Expr {
         let s = self.storage_value();
         let mask = hex(self.mask());
@@ -808,7 +812,7 @@ impl BitAccessor<'_, '_> {
         }
     }
 
-    /// The bitfield read as `integer`, sign-extending a signed one.
+    /// Returns the bitfield read as `integer`, sign-extending a signed one.
     fn read_integer(&self, integer: Integer) -> Expr {
         let n = self.storage.bits;
         let value = if integer.signed {
@@ -845,7 +849,7 @@ impl BitAccessor<'_, '_> {
         }
     }
 
-    /// `value` converted to the unsigned storage type.
+    /// Returns `value` converted to the unsigned storage type.
     fn to_storage(&self, value: TokenStream, integer: Option<Integer>) -> Expr {
         match integer {
             Some(integer) if !integer.signed && integer.bits == self.storage.bits => {
@@ -858,7 +862,7 @@ impl BitAccessor<'_, '_> {
         }
     }
 
-    /// The statement storing `bits` into the bitfield.
+    /// Returns the statement storing `bits` into the bitfield.
     fn write(&self, bits: &Expr) -> TokenStream {
         let s = self.storage_value();
         if self.bit.width == self.storage.bits {
@@ -878,7 +882,7 @@ impl BitAccessor<'_, '_> {
     }
 }
 
-/// `impl Default` returning all-zero bytes, valid for every generated type.
+/// Returns an all-zero `impl Default`, valid for every generated type.
 fn zeroed_default(name: &Ident) -> TokenStream {
     quote! {
         impl ::core::default::Default for #name {
@@ -891,7 +895,8 @@ fn zeroed_default(name: &Ident) -> TokenStream {
     }
 }
 
-/// Compile-time assertions on a type's size, alignment and member offsets.
+/// Returns compile-time assertions on a type's size, alignment and member
+/// offsets.
 fn layout_asserts(name: &Ident, size: u64, align: u64, offsets: &[(Ident, u64)]) -> TokenStream {
     let size = hex(size);
     let align = hex(align);
@@ -908,7 +913,8 @@ fn layout_asserts(name: &Ident, size: u64, align: u64, offsets: &[(Ident, u64)])
     }
 }
 
-/// The `repr` attribute for a layout, plus a doc paragraph explaining it.
+/// Returns the `repr` attribute for a layout, plus a doc paragraph explaining
+/// it.
 fn repr_attribute(repr: Repr) -> (TokenStream, Option<String>) {
     match repr {
         Repr::C => (quote! { #[repr(C)] }, None),
@@ -923,13 +929,13 @@ fn repr_attribute(repr: Repr) -> (TokenStream, Option<String>) {
     }
 }
 
-/// A one-line doc attribute.
+/// Returns a one-line doc attribute.
 pub(crate) fn doc(text: String) -> TokenStream {
     let text = format!(" {text}");
     quote! { #[doc = #text] }
 }
 
-/// A doc comment of several paragraphs.
+/// Returns a doc comment of several paragraphs.
 pub(crate) fn docs(paragraphs: &[String]) -> TokenStream {
     let lines = paragraphs.iter().enumerate().map(|(i, paragraph)| {
         let line = doc(paragraph.clone());
@@ -942,12 +948,12 @@ pub(crate) fn docs(paragraphs: &[String]) -> TokenStream {
     quote! { #(#lines)* }
 }
 
-/// A hexadecimal integer literal.
+/// Returns a hexadecimal integer literal.
 pub(crate) fn hex(value: u64) -> syn::LitInt {
     syn::LitInt::new(&format!("{value:#x}"), Span::call_site())
 }
 
-/// `a`, `a and b`, `a, b and c`.
+/// Joins words as `a`, `a and b` or `a, b and c`.
 fn join_words(words: &[String]) -> String {
     match words {
         [] => String::new(),
@@ -956,7 +962,7 @@ fn join_words(words: &[String]) -> String {
     }
 }
 
-/// A namespaced name for messages, e.g. `game::Entity`.
+/// Returns a namespaced name for messages, such as `ns::Entity`.
 pub(crate) fn qualified(namespace: &[String], name: &str) -> String {
     namespace
         .iter()

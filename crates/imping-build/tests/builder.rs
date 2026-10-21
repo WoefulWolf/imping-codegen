@@ -1,9 +1,8 @@
-//! `Builder`: generating to a path, errors, and `generate()` as a build script
-//! runs it.
+//! Tests `Builder`: generating to a path, errors, and `generate()` run the way
+//! a build script runs it.
 //!
-//! `generate()` reads `OUT_DIR` from the environment and prints to standard
-//! output, so it runs in a child process: the `child_generate` test re-runs
-//! this test binary with `OUT_DIR` set (or removed) and reports on stdout.
+//! `generate()` reads `OUT_DIR` and prints to stdout, so it runs in a child:
+//! `child_generate` re-runs this binary with `OUT_DIR` set or removed.
 
 use imping_build::{Builder, Error};
 use std::path::{Path, PathBuf};
@@ -13,7 +12,7 @@ fn fixture() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/small.json")
 }
 
-/// An empty scratch directory for one test.
+/// Returns an empty scratch directory for one test.
 fn scratch(name: &str) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR"))
         .join("imping-build")
@@ -138,7 +137,7 @@ fn errors_name_the_file_involved() {
 /// Set in the child process to the scenario it should run.
 const CHILD: &str = "IMPING_BUILD_TEST_CHILD";
 
-/// Runs `generate()` when this binary is re-run as a child; does nothing in a
+/// Runs `generate()` when this binary is re-run as a child, and nothing in a
 /// normal test run.
 #[test]
 fn child_generate() {
@@ -155,8 +154,8 @@ fn child_generate() {
     }
 }
 
-/// Re-runs this test binary's `child_generate` with `scenario` and the given
-/// `OUT_DIR`, returning its standard output.
+/// Re-runs `child_generate` with `scenario` and the given `OUT_DIR`, and
+/// returns its stdout.
 fn run_child(scenario: &str, out_dir: Option<&Path>) -> String {
     let mut command = Command::new(std::env::current_exe().expect("current exe"));
     command

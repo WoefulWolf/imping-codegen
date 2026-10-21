@@ -1,7 +1,7 @@
-//! Test-only crate: compiles the bindings generated from imping-codegen's x64
-//! fixture IR, under this workspace's lints, and checks them at run time.
+//! Compiles the bindings generated from imping-codegen's x64 fixture IR under
+//! this workspace's lints, and tests them at run time.
 //!
-//! Compiling it at all checks the generated layout assertions.
+//! Just compiling it checks the generated layout assertions.
 
 include!(concat!(env!("OUT_DIR"), "/imped.rs"));
 
@@ -44,15 +44,16 @@ mod strings {
         let _: game::ui::Rename::Signature = rename_like;
         let _: game::LPCSTR = CStrPtr::null();
         let title = WString::from("Sir");
-        // SAFETY: The function ignores its argument.
+        // SAFETY: the function ignores its argument.
         unsafe { set_title_like(title.as_ptr()) };
     }
 }
 
-/// Generated functions and globals. `game.exe` is not loaded in the test
-/// process, so these check everything up to `init`; calling and hooking real
-/// functions through generated code is covered end to end with a fixture game
-/// later, and by imping-runtime's own tests of the same plumbing.
+/// Tests generated functions and globals.
+///
+/// `game.exe` isn't loaded in the test process, so these check everything up
+/// to `init`; imping-runtime's tests cover calling and hooking through the
+/// same plumbing.
 #[cfg(test)]
 mod functions {
     use super::game;
@@ -81,7 +82,7 @@ mod functions {
             Error::NotInitialized { module: "game.exe" }
         ));
         let error = game::entity::Update::hook(|original, this, dt| {
-            // SAFETY: Never runs; the hook is not installed.
+            // SAFETY: never runs, since the hook isn't installed.
             unsafe { original.call(this, dt * 0.5) }
         })
         .unwrap_err();
@@ -97,7 +98,7 @@ mod functions {
     #[test]
     #[should_panic(expected = "is not initialized")]
     fn unsafe_calls_panic_before_init() {
-        // SAFETY: It panics before calling anything, since `init` hasn't run.
+        // SAFETY: panics before calling anything, since `init` hasn't run.
         unsafe { game::GetPlayer() };
     }
 

@@ -1,5 +1,4 @@
-//! Generates bindings from an IR file and prints them, with any warnings on
-//! stderr.
+//! Generates bindings from an IR file and prints them, with warnings on stderr.
 //!
 //! Run with: `cargo run -p imping-codegen --example generate -- <ir.json> [<ir module>=<rust module>]`
 //!

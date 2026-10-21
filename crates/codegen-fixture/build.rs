@@ -1,5 +1,5 @@
-//! Generates bindings from imping-codegen's x64 fixture IR into `OUT_DIR`, the
-//! way a mod's build script would.
+//! Generates bindings from imping-codegen's x64 fixture IR into `OUT_DIR`, as a
+//! mod's build script would.
 
 use std::path::PathBuf;
 
@@ -11,8 +11,8 @@ fn main() {
     let bindings = imping_codegen::Generator::new()
         .generate(&ir)
         .expect("fixture IR generates");
-    // The fixture deliberately triggers warnings; imping-codegen's own tests
-    // check them, so they are not repeated as cargo warnings here.
+    // The fixture triggers warnings on purpose; imping-codegen's tests check
+    // them.
     let out_dir = PathBuf::from(std::env::var_os("OUT_DIR").expect("OUT_DIR is set"));
     std::fs::write(out_dir.join("imped.rs"), bindings.source()).expect("OUT_DIR is writable");
 }

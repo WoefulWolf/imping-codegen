@@ -24,13 +24,12 @@ pub(crate) struct TypeTable<'a> {
 }
 
 impl<'a> TypeTable<'a> {
-    /// Indexes `module`'s types, registers the namespace of every type
-    /// emitted as an item in `root`, and claims the type's name in that
-    /// namespace's scope, lowest type id first; a clashing name gets the type
-    /// id as a suffix.
+    /// Indexes `module`'s types and claims a name for each item type in its
+    /// namespace under `root`, lowest id first.
     ///
-    /// The module paths are known only once `root` has named its modules;
-    /// call [`TypeTable::resolve_modules`] then.
+    /// A clashing name gets the type id as a suffix. Module paths are known
+    /// only once `root` has named its modules; call
+    /// [`TypeTable::resolve_modules`] then.
     pub(crate) fn new(module: &'a Module, root: &mut Namespace) -> Self {
         let by_id: HashMap<u32, &TypeDef> =
             module.types.iter().map(|def| (def.id.0, def)).collect();
@@ -68,8 +67,10 @@ impl<'a> TypeTable<'a> {
         }
     }
 
-    /// The names of the tuple structs (enum newtypes) emitted into each
-    /// namespace. A function parameter can't take one of these names.
+    /// Returns the names of the tuple structs (enum newtypes) in each
+    /// namespace.
+    ///
+    /// A function parameter can't take one of these names.
     pub(crate) fn tuple_struct_names(&self) -> Vec<(&'a [String], &str)> {
         self.names
             .iter()
@@ -78,18 +79,19 @@ impl<'a> TypeTable<'a> {
             .collect()
     }
 
-    /// The type's source name with its namespace, for docs and messages.
+    /// Returns the type's source name with its namespace, for docs and
+    /// messages.
     pub(crate) fn source_name(&self, id: TypeId) -> String {
         let def = self.get(id);
         qualified(&def.namespace, &def.name)
     }
 
-    /// The IR module these types belong to.
+    /// Returns the IR module these types belong to.
     pub(crate) fn module(&self) -> &'a Module {
         self.module
     }
 
-    /// The pointer size in bytes of the module's architecture.
+    /// Returns the module's pointer size in bytes.
     pub(crate) fn pointer_size(&self) -> u64 {
         match self.module.architecture {
             Architecture::X86 => 4,
@@ -97,8 +99,7 @@ impl<'a> TypeTable<'a> {
         }
     }
 
-    /// Looks up a type. The IR has been validated, so every referenced id
-    /// exists.
+    /// Looks up a type; validation guarantees every referenced id exists.
     pub(crate) fn get(&self, id: TypeId) -> &'a TypeDef {
         self.by_id
             .get(&id.0)
@@ -118,21 +119,23 @@ impl<'a> TypeTable<'a> {
         None
     }
 
-    /// Whether a type is emitted as its own item.
+    /// Returns whether a type is emitted as its own item.
     pub(crate) fn is_item(&self, id: TypeId) -> bool {
         self.names.contains_key(&id.0)
     }
 
-    /// The Rust name of a type emitted as an item.
+    /// Returns the Rust name of a type emitted as an item.
     pub(crate) fn name(&self, id: TypeId) -> &str {
         self.names
             .get(&id.0)
             .unwrap_or_else(|| panic!("type id {} is not an item", id.0))
     }
 
-    /// Whether a type is emitted as its own item, rather than written inline
-    /// (primitives, pointers, arrays, function types) or replaced by its
-    /// target (typedefs with their target's name, typedefs of function types).
+    /// Returns whether a type gets its own item.
+    ///
+    /// Primitives, pointers, arrays and function types are written inline;
+    /// typedefs of function types or with their target's name become the
+    /// target.
     fn is_item_kind(&self, def: &TypeDef) -> bool {
         match def.kind {
             TypeKind::Struct { .. }
@@ -156,8 +159,8 @@ impl<'a> TypeTable<'a> {
         }
     }
 
-    /// The Rust type expression for `id`, written from a module `depth` levels
-    /// below the bindings' module root.
+    /// Returns the Rust type expression for `id`, written from a module
+    /// `depth` levels below the bindings' root.
     pub(crate) fn rust_type(&self, id: TypeId, depth: usize) -> TokenStream {
         let def = self.get(id);
         match &def.kind {
@@ -197,9 +200,11 @@ impl<'a> TypeTable<'a> {
         }
     }
 
-    /// Whether a type is a text character: through typedefs, a primitive named
-    /// `char` (one byte) or `wchar_t` / `wchar16` (two bytes). Pointers to and
-    /// arrays of them become the runtime's string types.
+    /// Returns the text kind of a character type, if it is one.
+    ///
+    /// Through typedefs, that's a primitive named `char` (one byte) or
+    /// `wchar_t` / `wchar16` (two bytes). Pointers to and arrays of them
+    /// become the runtime's string types.
     pub(crate) fn text_kind(&self, id: TypeId) -> Option<Text> {
         let def = self.peel(id)?;
         match (def.name.as_str(), &def.kind) {
@@ -219,10 +224,11 @@ impl<'a> TypeTable<'a> {
         }
     }
 
-    /// Whether a value of this type can't hand the target a data pointer: the
-    /// IR describes no pointer in it at any depth. Function pointers are
-    /// allowed, since safe Rust can only make valid ones. Opaque types count
-    /// as possibly containing pointers.
+    /// Returns whether a value of this type can't hand the target a data
+    /// pointer, because the IR shows no pointer in it at any depth.
+    ///
+    /// Function pointers are fine, since safe Rust can only make valid ones.
+    /// Opaque types count as possibly holding pointers.
     pub(crate) fn is_pointer_free(&self, id: TypeId) -> bool {
         self.pointer_free_within(id, MAX_TYPEDEF_DEPTH)
     }
@@ -245,7 +251,7 @@ impl<'a> TypeTable<'a> {
         }
     }
 
-    /// The path to a type item from `depth` levels below the module root: up
+    /// Returns the path to a type item from `depth` levels below the root: up
     /// to the root, then down the type's namespace modules.
     pub(crate) fn path(&self, id: TypeId, depth: usize) -> TokenStream {
         let name = names::ident(self.name(id));
@@ -259,7 +265,7 @@ impl<'a> TypeTable<'a> {
         quote! { #(#supers)* #(#modules::)* #name }
     }
 
-    /// The nullable function-pointer type for a function type.
+    /// Returns the nullable function-pointer type for a function type.
     fn function_pointer(&self, def: &TypeDef, depth: usize) -> TokenStream {
         let TypeKind::Function {
             calling_convention,
@@ -286,7 +292,7 @@ impl<'a> TypeTable<'a> {
         }
     }
 
-    /// Whether a type is `void`, through typedefs.
+    /// Returns whether a type is `void`, through typedefs.
     pub(crate) fn is_void(&self, id: TypeId) -> bool {
         matches!(
             self.peel(id).map(|def| &def.kind),
@@ -296,7 +302,8 @@ impl<'a> TypeTable<'a> {
         )
     }
 
-    /// The integer primitive an enum or typedef chain resolves to, if any.
+    /// Returns the integer primitive a type resolves to through typedefs, if
+    /// any.
     pub(crate) fn integer(&self, id: TypeId) -> Option<Integer> {
         match self.peel(id)?.kind {
             TypeKind::Primitive { primitive } => Integer::from_primitive(primitive),
@@ -305,7 +312,7 @@ impl<'a> TypeTable<'a> {
     }
 }
 
-/// The Rust ABI string for a calling convention.
+/// Returns the Rust ABI string for a calling convention.
 pub(crate) fn abi(
     architecture: Architecture,
     convention: CallingConvention,
@@ -324,7 +331,7 @@ pub(crate) fn abi(
     syn::LitStr::new(abi, Span::call_site())
 }
 
-/// The Rust type for a primitive.
+/// Returns the Rust type for a primitive.
 fn primitive_type(primitive: Primitive) -> TokenStream {
     match primitive {
         Primitive::Void => quote! { ::core::ffi::c_void },
@@ -352,7 +359,7 @@ pub(crate) enum Text {
 }
 
 impl Text {
-    /// The runtime type for a pointer to this text.
+    /// Returns the runtime type for a pointer to this text.
     pub(crate) fn pointer(self) -> TokenStream {
         match self {
             Text::Narrow => quote! { ::imping_runtime::CStrPtr },
@@ -360,7 +367,7 @@ impl Text {
         }
     }
 
-    /// The runtime type for a fixed-size buffer of `count` characters.
+    /// Returns the runtime type for a fixed-size buffer of `count` characters.
     pub(crate) fn buffer(self, count: proc_macro2::Literal) -> TokenStream {
         match self {
             Text::Narrow => quote! { ::imping_runtime::CStrBuf<#count> },
@@ -379,7 +386,7 @@ pub(crate) struct Integer {
 }
 
 impl Integer {
-    /// The integer a primitive is, if it is one.
+    /// Returns the integer a primitive is, if it is one.
     pub(crate) fn from_primitive(primitive: Primitive) -> Option<Self> {
         let (bits, signed) = match primitive {
             Primitive::U8 => (8, false),
@@ -395,7 +402,7 @@ impl Integer {
         Some(Self { bits, signed })
     }
 
-    /// The unsigned integer of the same width.
+    /// Returns the unsigned integer `bits` wide.
     pub(crate) fn unsigned(bits: u32) -> Self {
         Self {
             bits,
@@ -403,13 +410,13 @@ impl Integer {
         }
     }
 
-    /// The Rust type name, e.g. `u32`.
+    /// Returns the Rust type name, such as `u32`.
     pub(crate) fn ident(self) -> proc_macro2::Ident {
         let prefix = if self.signed { "i" } else { "u" };
         format_ident!("{prefix}{}", self.bits)
     }
 
-    /// The width in bytes.
+    /// Returns the width in bytes.
     pub(crate) fn bytes(self) -> u64 {
         u64::from(self.bits / 8)
     }

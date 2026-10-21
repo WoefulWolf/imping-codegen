@@ -10,9 +10,9 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [workspace.dependencies]
-# Sibling suite repos, by relative path during development.
+# Sibling imping repos, by relative path.
 imping-ir = { path = "../imping-ir" }
-# Only the test-only codegen-fixture crate uses it: generated code needs it.
+# Only codegen-fixture uses it, since the generated code depends on it.
 imping-runtime = { path = "../imping-runtime" }
 imping-codegen = { path = "crates/imping-codegen" }
 

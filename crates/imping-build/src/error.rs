@@ -1,9 +1,11 @@
-//! The error type.
+//! Error type.
 
 use core::fmt;
 use std::path::PathBuf;
 
-/// Why generating bindings failed. Messages name the file involved.
+/// Why generating bindings failed.
+///
+/// Messages name the file involved.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum Error {
@@ -48,8 +50,7 @@ impl fmt::Display for Error {
             }
             Error::Parse { path, source } => {
                 write!(f, "`{}` is not a valid IR file: {source}", path.display())?;
-                // The IR error's own cause (e.g. the JSON line and column) is
-                // what the user needs to fix the file.
+                // The cause chain has the JSON line and column to fix.
                 let mut cause = core::error::Error::source(source);
                 while let Some(error) = cause {
                     write!(f, ": {error}")?;

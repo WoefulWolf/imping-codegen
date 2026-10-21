@@ -9,11 +9,10 @@ publish.workspace = true
 
 [dependencies]
 imping-ir.workspace = true
-# Code generation and formatting.
 proc-macro2 = "1"
 quote = "1"
 syn = { version = "3", default-features = false, features = ["full", "parsing", "printing"] }
-# `verbatim` formats the arguments of standard macros such as `assert!`.
+# `verbatim` formats the arguments of macros like `assert!`.
 prettyplease = { version = "0.3", features = ["verbatim"] }
 
 [dev-dependencies]

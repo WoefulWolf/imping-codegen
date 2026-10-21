@@ -1,4 +1,4 @@
-//! The `imping` command-line tool: generates Rust bindings from IR files.
+//! The `imping` command-line tool, which generates Rust bindings from IR files.
 //!
 //! Run `imping --help` for usage.
 

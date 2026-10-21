@@ -1,7 +1,7 @@
-//! Turning IR names into Rust identifiers.
+//! Turns IR names into Rust identifiers.
 //!
-//! Names are handled as their bare text (`type`, not `r#type`) until they are
-//! turned into tokens by [`ident`], which adds the `r#` prefix for keywords.
+//! Names stay bare text (`type`, not `r#type`) until [`ident`] turns them into
+//! tokens, adding `r#` for keywords.
 
 use proc_macro2::{Ident, Span};
 use std::collections::HashSet;
@@ -19,9 +19,10 @@ const RAW_KEYWORDS: &[&str] = &[
 /// Keywords that can't be raw identifiers; they get a trailing underscore.
 const UNRAWABLE_KEYWORDS: &[&str] = &["self", "Self", "super", "crate"];
 
-/// Turns a source name into a valid bare identifier: characters other than
-/// ASCII letters, digits and `_` become `_`, a leading digit gets a `_`
-/// prefix, and keywords that can't be raw get a trailing `_`.
+/// Turns a source name into a valid bare identifier.
+///
+/// Characters other than ASCII letters, digits and `_` become `_`, a leading
+/// digit gets a `_` prefix, and keywords that can't be raw get a trailing `_`.
 pub(crate) fn sanitize(name: &str) -> String {
     let mut text: String = name
         .chars()
@@ -73,8 +74,8 @@ pub(crate) fn snake_case(name: &str) -> String {
     sanitize(&words.join("_"))
 }
 
-/// Derives a Rust module name from an IR module's file name: the extension
-/// is dropped and the rest converted to snake case.
+/// Derives a Rust module name from an IR module's file name, dropping the
+/// extension and converting the rest to snake case.
 pub(crate) fn module_name(file_name: &str) -> String {
     let stem = match file_name.rsplit_once('.') {
         Some((stem, _)) if !stem.is_empty() => stem,
@@ -107,7 +108,7 @@ pub(crate) fn ident(text: &str) -> Ident {
     }
 }
 
-/// The names already used in one Rust scope, for resolving clashes.
+/// Tracks the names used in one Rust scope, to resolve clashes.
 #[derive(Debug, Default)]
 pub(crate) struct Scope {
     used: HashSet<String>,
