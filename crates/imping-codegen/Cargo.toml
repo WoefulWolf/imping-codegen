@@ -1,6 +1,6 @@
 [package]
 name = "imping-codegen"
-description = "Rust code generation from IR for the imping modding suite."
+description = "Rust code generation from IR for the imping toolkit."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

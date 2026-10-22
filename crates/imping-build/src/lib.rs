@@ -9,7 +9,7 @@
 //! ```no_run
 //! // build.rs
 //! fn main() -> Result<(), imping_build::Error> {
-//!     imping_build::Builder::new("ir/game.json").generate()
+//!     imping_build::Builder::new("ir/target.json").generate()
 //! }
 //! ```
 //!
@@ -25,9 +25,9 @@
 //!
 //! ```text
 //! cargo install --path crates/imping-build --features cli
-//! imping generate ir/game.json -o src/imped.rs --module-name GameAssembly.dll=game
-//! imping generate ir/game.json -o src/imped.rs --accept-build game.exe=0x64b8f2a1:0xa3c000
-//! imping check ir/game.json
+//! imping generate ir/target.json -o src/imped.rs --module-name TargetCore.dll=target
+//! imping generate ir/target.json -o src/imped.rs --accept-build target.exe=0x64b8f2a1:0xa3c000
+//! imping check ir/target.json
 //! ```
 
 mod error;
@@ -54,11 +54,11 @@ const DEFAULT_OUT_FILE: &str = "imped.rs";
 /// # Examples
 ///
 /// ```no_run
-/// // build.rs, for a packed `game.exe` that keeps its timestamp but grows
+/// // build.rs, for a packed `target.exe` that keeps its timestamp but grows
 /// // the image.
 /// fn main() -> Result<(), imping_build::Error> {
-///     imping_build::Builder::new("ir/game.json")
-///         .accept_build("game.exe", 0x64b8f2a1, 0xa3c000)
+///     imping_build::Builder::new("ir/target.json")
+///         .accept_build("target.exe", 0x64b8f2a1, 0xa3c000)
 ///         .generate()
 /// }
 /// ```

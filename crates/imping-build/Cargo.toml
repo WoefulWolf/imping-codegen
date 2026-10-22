@@ -1,6 +1,6 @@
 [package]
 name = "imping-build"
-description = "Build-script helper and command-line tool that generate Rust bindings for the imping modding suite."
+description = "Build-script helper and command-line tool that generate Rust bindings for the imping toolkit."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

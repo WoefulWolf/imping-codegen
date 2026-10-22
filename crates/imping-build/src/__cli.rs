@@ -41,12 +41,12 @@ enum Command {
 #[derive(Debug, clap::Args)]
 struct ModuleNames {
     /// Names the Rust module generated for an IR module, e.g.
-    /// `GameAssembly.dll=game`. May be repeated.
+    /// `TargetCore.dll=target`. May be repeated.
     #[arg(long = "module-name", value_name = "IR=RUST", value_parser = parse_module_name)]
     module_names: Vec<(String, String)>,
     /// Makes an IR module's `init()` also accept another build of it, by the
     /// timestamp and image size from its image header, e.g.
-    /// `game.exe=0x64b8f2a1:0xa3c000`. May be repeated.
+    /// `target.exe=0x64b8f2a1:0xa3c000`. May be repeated.
     #[arg(long = "accept-build", value_name = "IR=TIMESTAMP:IMAGE_SIZE", value_parser = parse_accept_build)]
     accept_builds: Vec<(String, u32, u32)>,
 }

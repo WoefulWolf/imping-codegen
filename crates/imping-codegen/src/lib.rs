@@ -10,7 +10,7 @@
 //! let ir = imping_ir::Ir::from_json_str(r#"{
 //!     "format_version": { "major": 1, "minor": 0 },
 //!     "modules": [{
-//!         "name": "game.exe", "architecture": "x64",
+//!         "name": "target.exe", "architecture": "x64",
 //!         "image_base": "0x140000000", "timestamp": "0x64b8f2a1", "image_size": "0xa2b000",
 //!         "types": [
 //!             { "id": 0, "name": "float", "kind": "primitive", "primitive": "f32" },
@@ -24,7 +24,7 @@
 //! }"#)?;
 //!
 //! let bindings = imping_codegen::Generator::new().generate(&ir)?;
-//! assert!(bindings.source().contains("pub mod game"));
+//! assert!(bindings.source().contains("pub mod target"));
 //! assert!(bindings.source().contains("pub struct Vector2"));
 //! assert!(bindings.warnings().is_empty());
 //! # Ok::<(), Box<dyn std::error::Error>>(())
@@ -35,7 +35,7 @@
 //! - Each module gets a `MODULE` identity and an `init()` that checks the
 //!   running build against it.
 //! - Types, functions and globals go in one module per namespace
-//!   (`game::hw::cVec4` for the type `Hw::cVec4`).
+//!   (`target::hw::cVec4` for the type `Hw::cVec4`).
 //! - Structs become `#[repr(C)]` with explicit padding, bitfield accessors and
 //!   compile-time checks on size, alignment and every field offset; unions get
 //!   the same checks.
@@ -80,8 +80,8 @@ use std::collections::HashMap;
 ///
 /// ```
 /// let generator = imping_codegen::Generator::new()
-///     .module_name("GameAssembly.dll", "game")
-///     .accept_build("GameAssembly.dll", 0x64b8f2a1, 0xa3c000);
+///     .module_name("TargetCore.dll", "target")
+///     .accept_build("TargetCore.dll", 0x64b8f2a1, 0xa3c000);
 /// ```
 #[derive(Debug, Clone, Default)]
 pub struct Generator {
@@ -100,7 +100,7 @@ impl Generator {
     /// Names the Rust module generated for the IR module `ir_name`.
     ///
     /// By default it's the IR module's file name without the extension, in
-    /// snake case: `GameAssembly.dll` becomes `game_assembly`. If the same
+    /// snake case: `TargetCore.dll` becomes `target_core`. If the same
     /// `ir_name` is given more than once, the last call wins.
     pub fn module_name(mut self, ir_name: impl Into<String>, rust_name: impl Into<String>) -> Self {
         self.module_names.push((ir_name.into(), rust_name.into()));
