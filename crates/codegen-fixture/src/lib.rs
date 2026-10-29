@@ -90,6 +90,15 @@ mod functions {
     }
 
     #[test]
+    fn resolve_fails_before_init() {
+        assert!(matches!(
+            game::entity::Update::resolve(),
+            Err(Error::NotInitialized { module: "game.exe" })
+        ));
+        assert!(game::GetPlayer::resolve().is_err());
+    }
+
+    #[test]
     #[should_panic(expected = "imping: `game.exe` is not initialized; call its `init()` first")]
     fn function_pointers_panic_before_init() {
         game::GetPlayer::ptr();

@@ -1,7 +1,8 @@
 //! Emits functions and globals, one module per namespace.
 //!
 //! Each function becomes an `unsafe fn` plus a module of the same name holding
-//! its `RVA`, `VERIFICATION`, `Signature`, `ptr()` and `hook()`. Types are
+//! its `RVA`, `VERIFICATION`, `Signature`, `resolve()`, `ptr()` and `hook()`,
+//! and the private `FUNCTION` they find it through. Types are
 //! named through explicit `super::` paths, not glob imports, so an item in a
 //! namespace module (such as a constructor `Entity::Entity`) can't shadow the
 //! type it refers to.
@@ -22,9 +23,9 @@ use std::collections::{HashMap, HashSet};
 const MAX_HOOK_PARAMETERS: usize = 14;
 
 /// The items of a function's own module that its parameters could clash with
-/// in Rust patterns: its constants, its `SLOT` static and the tuple struct
-/// `Original`.
-const FUNCTION_MODULE_VALUES: &[&str] = &["RVA", "VERIFICATION", "SLOT", "Original"];
+/// in Rust patterns: its constants, its `FUNCTION` and `SLOT` statics and the
+/// tuple struct `Original`.
+const FUNCTION_MODULE_VALUES: &[&str] = &["RVA", "VERIFICATION", "FUNCTION", "SLOT", "Original"];
 
 /// The function tag that marks a function as safe to call with valid
 /// arguments.
@@ -356,16 +357,31 @@ fn emit_function(
         #[doc = " The function's type."]
         pub type Signature = unsafe extern #abi fn(#(#signature_params),* #dots) #output_inner;
     };
+    let verified = !function.verification.is_empty();
+    let verification_item = verified.then(|| {
+        let bytes = function
+            .verification
+            .iter()
+            .map(|byte| hex(u64::from(*byte)));
+        quote! {
+            #[doc = " The bytes expected at the function's start; `resolve` and `hook` check them."]
+            pub const VERIFICATION: &[u8] = &[#(#bytes),*];
+        }
+    });
+    let function_item = function_item(function, &qualified_name, verified, &to_root);
+    let resolve_item = resolve_item(&file, verified, function.pattern.is_some());
     let ptr_doc = docs(&[
         "The function's address in this process.".to_owned(),
         "# Panics".to_owned(),
-        format!("If `{file}`'s `init()` has not succeeded."),
+        format!("If `resolve()` fails, as it does before `{file}`'s `init()`."),
     ]);
     let ptr_item = quote! {
         #ptr_doc
         pub fn ptr() -> Signature {
-            #[comment = " SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type."]
-            unsafe { ::core::mem::transmute::<usize, Signature>(#to_root MODULE.address(RVA)) }
+            match resolve() {
+                ::core::result::Result::Ok(function) => function,
+                ::core::result::Result::Err(error) => ::core::panic!("imping: {error}"),
+            }
         }
     };
 
@@ -378,22 +394,15 @@ fn emit_function(
             #doc
             pub mod #fn_ident {
                 #rva_item
+                #verification_item
                 #signature_item
+                #function_item
+                #resolve_item
                 #ptr_item
             }
         };
     }
 
-    let verification_item = (!function.verification.is_empty()).then(|| {
-        let bytes = function
-            .verification
-            .iter()
-            .map(|byte| hex(u64::from(*byte)));
-        quote! {
-            #[doc = " The bytes expected at the function's start; `hook` checks them before patching it."]
-            pub const VERIFICATION: &[u8] = &[#(#bytes),*];
-        }
-    });
     let hook_items = if parameters.len() <= MAX_HOOK_PARAMETERS {
         hook_items(
             &parameters,
@@ -401,8 +410,8 @@ fn emit_function(
             &abi,
             &shown,
             &file,
-            &to_root,
-            !function.verification.is_empty(),
+            verified,
+            function.pattern.is_some(),
         )
     } else {
         warnings.push(Warning::HookUnavailable {
@@ -444,7 +453,7 @@ fn emit_function(
     }
     let panics = [
         "# Panics".to_owned(),
-        format!("If `{file}`'s `init()` has not succeeded."),
+        format!("If `{name}::resolve()` fails, as it does before `{file}`'s `init()`."),
     ];
     let wrapper = match safe {
         Some(safe) => {
@@ -496,8 +505,90 @@ fn emit_function(
             #rva_item
             #verification_item
             #signature_item
+            #function_item
+            #resolve_item
             #ptr_item
             #hook_items
+        }
+    }
+}
+
+/// Returns the private `FUNCTION` static that `resolve()` and `hook()` find the
+/// function through.
+fn function_item(
+    function: &Function,
+    qualified_name: &str,
+    verified: bool,
+    to_root: &TokenStream,
+) -> TokenStream {
+    let verification = if verified {
+        quote! { VERIFICATION }
+    } else {
+        quote! { &[] }
+    };
+    let pattern = match &function.pattern {
+        Some(pattern) => {
+            let bytes = &pattern.bytes;
+            let offset = proc_macro2::Literal::i32_unsuffixed(pattern.offset);
+            let follow_call = pattern.follow_call;
+            quote! {
+                ::core::option::Option::Some(::imping_runtime::__private::Pattern {
+                    bytes: #bytes,
+                    offset: #offset,
+                    follow_call: #follow_call,
+                })
+            }
+        }
+        None => quote! { ::core::option::Option::None },
+    };
+    quote! {
+        static FUNCTION: ::imping_runtime::__private::Function =
+            ::imping_runtime::__private::Function::new(
+                &#to_root MODULE,
+                #qualified_name,
+                RVA,
+                #verification,
+                #pattern,
+            );
+    }
+}
+
+/// Returns a function's `resolve()`.
+fn resolve_item(file: &str, verified: bool, has_pattern: bool) -> TokenStream {
+    let (how, errors) = if verified {
+        let mut how = format!(
+            "On a build `{file}`'s `init()` accepts, that's `RVA`. On another, the first call \
+             checks the bytes there against `VERIFICATION`"
+        );
+        let mut errors = format!(
+            "Fails unless `{file}`'s `init()` has succeeded, or on a build it doesn't accept, \
+             if the first bytes differ from `VERIFICATION`"
+        );
+        if has_pattern {
+            how.push_str(", and if they differ, finds the function by its byte pattern instead");
+            errors.push_str(" and its byte pattern doesn't find the function");
+        }
+        how.push('.');
+        errors.push('.');
+        (how, errors)
+    } else {
+        (
+            "That's `RVA`, unchecked, as there are no bytes to verify it by.".to_owned(),
+            format!("Fails unless `{file}`'s `init()` has succeeded."),
+        )
+    };
+    let doc = docs(&[
+        "Finds the function in this process.".to_owned(),
+        how,
+        "# Errors".to_owned(),
+        errors,
+    ]);
+    quote! {
+        #doc
+        pub fn resolve() -> ::imping_runtime::Result<Signature> {
+            let address = FUNCTION.resolve()?;
+            #[comment = " SAFETY: `resolve` returns the function's non-null address, and `init`'s caller promised the function has this type."]
+            ::core::result::Result::Ok(unsafe { ::core::mem::transmute::<usize, Signature>(address) })
         }
     }
 }
@@ -510,8 +601,8 @@ fn hook_items(
     abi: &syn::LitStr,
     shown: &str,
     file: &str,
-    to_root: &TokenStream,
     verified: bool,
+    has_pattern: bool,
 ) -> TokenStream {
     let types: Vec<&TokenStream> = parameters
         .iter()
@@ -523,17 +614,15 @@ fn hook_items(
         .collect();
     let args: Vec<&Ident> = parameters.iter().map(|parameter| &parameter.name).collect();
     let bound = quote! { for<'call> Fn(Original<'call>, #(#types),*) #output };
-    let verification = if verified {
-        quote! { VERIFICATION }
-    } else {
-        quote! { &[] }
-    };
     let mut errors = format!(
         "Fails unless `{file}`'s `init()` has succeeded, if this mod already holds a hook on \
          the function"
     );
     if verified {
         errors.push_str(", if its first bytes differ from `VERIFICATION`");
+        if has_pattern {
+            errors.push_str(" and its byte pattern doesn't find it elsewhere");
+        }
     }
     errors.push_str(", or if patching fails.");
     let hook_doc = docs(&[
@@ -596,9 +685,7 @@ fn hook_items(
             #[comment = " SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded."]
             unsafe {
                 ::imping_runtime::__private::install(
-                    &#to_root MODULE,
-                    RVA,
-                    #verification,
+                    &FUNCTION,
                     &SLOT,
                     ::std::boxed::Box::new(detour),
                     thunk,

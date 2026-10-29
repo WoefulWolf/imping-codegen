@@ -762,7 +762,7 @@ pub mod game {
     ///
     /// # Panics
     ///
-    /// If `game.exe`'s `init()` has not succeeded.
+    /// If `GetPlayer::resolve()` fails, as it does before `game.exe`'s `init()`.
     pub unsafe fn GetPlayer() -> *mut Entity {
         // SAFETY: forwarded to the caller.
         unsafe { GetPlayer::ptr()() }
@@ -775,15 +775,38 @@ pub mod game {
         /// The function's type.
         pub type Signature = unsafe extern "system" fn() -> *mut super::Entity;
 
+        static FUNCTION: ::imping_runtime::__private::Function = ::imping_runtime::__private::Function::new(
+            &super::MODULE,
+            "GetPlayer",
+            RVA,
+            &[],
+            ::core::option::Option::None,
+        );
+
+        /// Finds the function in this process.
+        ///
+        /// That's `RVA`, unchecked, as there are no bytes to verify it by.
+        ///
+        /// # Errors
+        ///
+        /// Fails unless `game.exe`'s `init()` has succeeded.
+        pub fn resolve() -> ::imping_runtime::Result<Signature> {
+            let address = FUNCTION.resolve()?;
+            // SAFETY: `resolve` returns the function's non-null address, and `init`'s caller promised the function has this type.
+            ::core::result::Result::Ok(unsafe {
+                ::core::mem::transmute::<usize, Signature>(address)
+            })
+        }
+
         /// The function's address in this process.
         ///
         /// # Panics
         ///
-        /// If `game.exe`'s `init()` has not succeeded.
+        /// If `resolve()` fails, as it does before `game.exe`'s `init()`.
         pub fn ptr() -> Signature {
-            // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
-            unsafe {
-                ::core::mem::transmute::<usize, Signature>(super::MODULE.address(RVA))
+            match resolve() {
+                ::core::result::Result::Ok(function) => function,
+                ::core::result::Result::Err(error) => ::core::panic!("imping: {error}"),
             }
         }
 
@@ -837,9 +860,7 @@ pub mod game {
             // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
             unsafe {
                 ::imping_runtime::__private::install(
-                    &super::MODULE,
-                    RVA,
-                    &[],
+                    &FUNCTION,
                     &SLOT,
                     ::std::boxed::Box::new(detour),
                     thunk,
@@ -856,7 +877,7 @@ pub mod game {
     ///
     /// # Panics
     ///
-    /// If `game.exe`'s `init()` has not succeeded.
+    /// If `init_2::resolve()` fails, as it does before `game.exe`'s `init()`.
     pub unsafe fn init_2() {
         // SAFETY: forwarded to the caller.
         unsafe { init_2::ptr()() }
@@ -869,15 +890,38 @@ pub mod game {
         /// The function's type.
         pub type Signature = unsafe extern "system" fn();
 
+        static FUNCTION: ::imping_runtime::__private::Function = ::imping_runtime::__private::Function::new(
+            &super::MODULE,
+            "init",
+            RVA,
+            &[],
+            ::core::option::Option::None,
+        );
+
+        /// Finds the function in this process.
+        ///
+        /// That's `RVA`, unchecked, as there are no bytes to verify it by.
+        ///
+        /// # Errors
+        ///
+        /// Fails unless `game.exe`'s `init()` has succeeded.
+        pub fn resolve() -> ::imping_runtime::Result<Signature> {
+            let address = FUNCTION.resolve()?;
+            // SAFETY: `resolve` returns the function's non-null address, and `init`'s caller promised the function has this type.
+            ::core::result::Result::Ok(unsafe {
+                ::core::mem::transmute::<usize, Signature>(address)
+            })
+        }
+
         /// The function's address in this process.
         ///
         /// # Panics
         ///
-        /// If `game.exe`'s `init()` has not succeeded.
+        /// If `resolve()` fails, as it does before `game.exe`'s `init()`.
         pub fn ptr() -> Signature {
-            // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
-            unsafe {
-                ::core::mem::transmute::<usize, Signature>(super::MODULE.address(RVA))
+            match resolve() {
+                ::core::result::Result::Ok(function) => function,
+                ::core::result::Result::Err(error) => ::core::panic!("imping: {error}"),
             }
         }
 
@@ -929,9 +973,7 @@ pub mod game {
             // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
             unsafe {
                 ::imping_runtime::__private::install(
-                    &super::MODULE,
-                    RVA,
-                    &[],
+                    &FUNCTION,
                     &SLOT,
                     ::std::boxed::Box::new(detour),
                     thunk,
@@ -948,7 +990,7 @@ pub mod game {
     ///
     /// # Panics
     ///
-    /// If `game.exe`'s `init()` has not succeeded.
+    /// If `Teleport::resolve()` fails, as it does before `game.exe`'s `init()`.
     pub unsafe fn Teleport(
         gPlayer_: *mut Entity,
         EntityKind_: EntityKind,
@@ -971,15 +1013,38 @@ pub mod game {
             MODULE_: i32,
         );
 
+        static FUNCTION: ::imping_runtime::__private::Function = ::imping_runtime::__private::Function::new(
+            &super::MODULE,
+            "Teleport",
+            RVA,
+            &[],
+            ::core::option::Option::None,
+        );
+
+        /// Finds the function in this process.
+        ///
+        /// That's `RVA`, unchecked, as there are no bytes to verify it by.
+        ///
+        /// # Errors
+        ///
+        /// Fails unless `game.exe`'s `init()` has succeeded.
+        pub fn resolve() -> ::imping_runtime::Result<Signature> {
+            let address = FUNCTION.resolve()?;
+            // SAFETY: `resolve` returns the function's non-null address, and `init`'s caller promised the function has this type.
+            ::core::result::Result::Ok(unsafe {
+                ::core::mem::transmute::<usize, Signature>(address)
+            })
+        }
+
         /// The function's address in this process.
         ///
         /// # Panics
         ///
-        /// If `game.exe`'s `init()` has not succeeded.
+        /// If `resolve()` fails, as it does before `game.exe`'s `init()`.
         pub fn ptr() -> Signature {
-            // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
-            unsafe {
-                ::core::mem::transmute::<usize, Signature>(super::MODULE.address(RVA))
+            match resolve() {
+                ::core::result::Result::Ok(function) => function,
+                ::core::result::Result::Err(error) => ::core::panic!("imping: {error}"),
             }
         }
 
@@ -1064,9 +1129,7 @@ pub mod game {
             // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
             unsafe {
                 ::imping_runtime::__private::install(
-                    &super::MODULE,
-                    RVA,
-                    &[],
+                    &FUNCTION,
                     &SLOT,
                     ::std::boxed::Box::new(detour),
                     thunk,
@@ -1097,7 +1160,7 @@ pub mod game {
         ///
         /// # Panics
         ///
-        /// If `game.exe`'s `init()` has not succeeded.
+        /// If `Update::resolve()` fails, as it does before `game.exe`'s `init()`.
         pub unsafe fn Update(this: *mut super::Entity, dt: f32) {
             // SAFETY: forwarded to the caller.
             unsafe { Update::ptr()(this, dt) }
@@ -1107,7 +1170,7 @@ pub mod game {
         pub mod Update {
             /// The function's address relative to `game.exe`'s base.
             pub const RVA: u32 = 0x15040;
-            /// The bytes expected at the function's start; `hook` checks them before patching it.
+            /// The bytes expected at the function's start; `resolve` and `hook` check them.
             pub const VERIFICATION: &[u8] = &[0x48, 0x83, 0xec, 0x28];
             /// The function's type.
             pub type Signature = unsafe extern "system" fn(
@@ -1115,18 +1178,44 @@ pub mod game {
                 dt: f32,
             );
 
+            static FUNCTION: ::imping_runtime::__private::Function = ::imping_runtime::__private::Function::new(
+                &super::super::MODULE,
+                "Entity::Update",
+                RVA,
+                VERIFICATION,
+                ::core::option::Option::Some(::imping_runtime::__private::Pattern {
+                    bytes: "e8 ?? ?? ?? ?? 48 8b d8",
+                    offset: 0,
+                    follow_call: true,
+                }),
+            );
+
+            /// Finds the function in this process.
+            ///
+            /// On a build `game.exe`'s `init()` accepts, that's `RVA`. On another, the first call checks the bytes there against `VERIFICATION`, and if they differ, finds the function by its byte pattern instead.
+            ///
+            /// # Errors
+            ///
+            /// Fails unless `game.exe`'s `init()` has succeeded, or on a build it doesn't accept, if the first bytes differ from `VERIFICATION` and its byte pattern doesn't find the function.
+            pub fn resolve() -> ::imping_runtime::Result<Signature> {
+                let address = FUNCTION.resolve()?;
+                // SAFETY: `resolve` returns the function's non-null address, and `init`'s caller promised the function has this type.
+                ::core::result::Result::Ok(unsafe {
+                    ::core::mem::transmute::<usize, Signature>(address)
+                })
+            }
+
             /// The function's address in this process.
             ///
             /// # Panics
             ///
-            /// If `game.exe`'s `init()` has not succeeded.
+            /// If `resolve()` fails, as it does before `game.exe`'s `init()`.
             pub fn ptr() -> Signature {
-                // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
-                unsafe {
-                    ::core::mem::transmute::<
-                        usize,
-                        Signature,
-                    >(super::super::MODULE.address(RVA))
+                match resolve() {
+                    ::core::result::Result::Ok(function) => function,
+                    ::core::result::Result::Err(error) => {
+                        ::core::panic!("imping: {error}")
+                    }
                 }
             }
 
@@ -1179,7 +1268,7 @@ pub mod game {
             ///
             /// # Errors
             ///
-            /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, if its first bytes differ from `VERIFICATION`, or if patching fails.
+            /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, if its first bytes differ from `VERIFICATION` and its byte pattern doesn't find it elsewhere, or if patching fails.
             pub fn hook(
                 detour: impl for<'call> Fn(
                     Original<'call>,
@@ -1190,9 +1279,7 @@ pub mod game {
                 // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
                 unsafe {
                     ::imping_runtime::__private::install(
-                        &super::super::MODULE,
-                        RVA,
-                        VERIFICATION,
+                        &FUNCTION,
                         &SLOT,
                         ::std::boxed::Box::new(detour),
                         thunk,
@@ -1209,7 +1296,7 @@ pub mod game {
         ///
         /// # Panics
         ///
-        /// If `game.exe`'s `init()` has not succeeded.
+        /// If `Damage_2::resolve()` fails, as it does before `game.exe`'s `init()`.
         pub unsafe fn Damage_2(this: *mut super::Entity, amount: f32) {
             // SAFETY: forwarded to the caller.
             unsafe { Damage_2::ptr()(this, amount) }
@@ -1225,18 +1312,40 @@ pub mod game {
                 amount: f32,
             );
 
+            static FUNCTION: ::imping_runtime::__private::Function = ::imping_runtime::__private::Function::new(
+                &super::super::MODULE,
+                "Entity::Damage",
+                RVA,
+                &[],
+                ::core::option::Option::None,
+            );
+
+            /// Finds the function in this process.
+            ///
+            /// That's `RVA`, unchecked, as there are no bytes to verify it by.
+            ///
+            /// # Errors
+            ///
+            /// Fails unless `game.exe`'s `init()` has succeeded.
+            pub fn resolve() -> ::imping_runtime::Result<Signature> {
+                let address = FUNCTION.resolve()?;
+                // SAFETY: `resolve` returns the function's non-null address, and `init`'s caller promised the function has this type.
+                ::core::result::Result::Ok(unsafe {
+                    ::core::mem::transmute::<usize, Signature>(address)
+                })
+            }
+
             /// The function's address in this process.
             ///
             /// # Panics
             ///
-            /// If `game.exe`'s `init()` has not succeeded.
+            /// If `resolve()` fails, as it does before `game.exe`'s `init()`.
             pub fn ptr() -> Signature {
-                // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
-                unsafe {
-                    ::core::mem::transmute::<
-                        usize,
-                        Signature,
-                    >(super::super::MODULE.address(RVA))
+                match resolve() {
+                    ::core::result::Result::Ok(function) => function,
+                    ::core::result::Result::Err(error) => {
+                        ::core::panic!("imping: {error}")
+                    }
                 }
             }
 
@@ -1303,9 +1412,7 @@ pub mod game {
                 // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
                 unsafe {
                     ::imping_runtime::__private::install(
-                        &super::super::MODULE,
-                        RVA,
-                        &[],
+                        &FUNCTION,
                         &SLOT,
                         ::std::boxed::Box::new(detour),
                         thunk,
@@ -1320,7 +1427,7 @@ pub mod game {
         ///
         /// # Panics
         ///
-        /// If `game.exe`'s `init()` has not succeeded.
+        /// If `Damage::resolve()` fails, as it does before `game.exe`'s `init()`.
         pub fn Damage(this: &mut super::Entity, amount: i32) {
             // SAFETY: the function is tagged `imping-safe` in the IR, which `init`'s caller vouched for: it needs only valid arguments and keeps none of the pointers, and the parameter types guarantee valid arguments.
             unsafe { Damage::ptr()(::core::ptr::from_mut(this), amount) }
@@ -1336,18 +1443,40 @@ pub mod game {
                 amount: i32,
             );
 
+            static FUNCTION: ::imping_runtime::__private::Function = ::imping_runtime::__private::Function::new(
+                &super::super::MODULE,
+                "Entity::Damage",
+                RVA,
+                &[],
+                ::core::option::Option::None,
+            );
+
+            /// Finds the function in this process.
+            ///
+            /// That's `RVA`, unchecked, as there are no bytes to verify it by.
+            ///
+            /// # Errors
+            ///
+            /// Fails unless `game.exe`'s `init()` has succeeded.
+            pub fn resolve() -> ::imping_runtime::Result<Signature> {
+                let address = FUNCTION.resolve()?;
+                // SAFETY: `resolve` returns the function's non-null address, and `init`'s caller promised the function has this type.
+                ::core::result::Result::Ok(unsafe {
+                    ::core::mem::transmute::<usize, Signature>(address)
+                })
+            }
+
             /// The function's address in this process.
             ///
             /// # Panics
             ///
-            /// If `game.exe`'s `init()` has not succeeded.
+            /// If `resolve()` fails, as it does before `game.exe`'s `init()`.
             pub fn ptr() -> Signature {
-                // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
-                unsafe {
-                    ::core::mem::transmute::<
-                        usize,
-                        Signature,
-                    >(super::super::MODULE.address(RVA))
+                match resolve() {
+                    ::core::result::Result::Ok(function) => function,
+                    ::core::result::Result::Err(error) => {
+                        ::core::panic!("imping: {error}")
+                    }
                 }
             }
 
@@ -1414,9 +1543,7 @@ pub mod game {
                 // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
                 unsafe {
                     ::imping_runtime::__private::install(
-                        &super::super::MODULE,
-                        RVA,
-                        &[],
+                        &FUNCTION,
                         &SLOT,
                         ::std::boxed::Box::new(detour),
                         thunk,
@@ -1433,7 +1560,7 @@ pub mod game {
         ///
         /// # Panics
         ///
-        /// If `game.exe`'s `init()` has not succeeded.
+        /// If `Entity::resolve()` fails, as it does before `game.exe`'s `init()`.
         pub unsafe fn Entity(this: *mut super::Entity) -> *mut super::Entity {
             // SAFETY: forwarded to the caller.
             unsafe { Entity::ptr()(this) }
@@ -1447,18 +1574,40 @@ pub mod game {
             pub type Signature = unsafe extern "system" fn(
                 this: *mut super::super::Entity,
             ) -> *mut super::super::Entity;
+            static FUNCTION: ::imping_runtime::__private::Function = ::imping_runtime::__private::Function::new(
+                &super::super::MODULE,
+                "Entity::Entity",
+                RVA,
+                &[],
+                ::core::option::Option::None,
+            );
+
+            /// Finds the function in this process.
+            ///
+            /// That's `RVA`, unchecked, as there are no bytes to verify it by.
+            ///
+            /// # Errors
+            ///
+            /// Fails unless `game.exe`'s `init()` has succeeded.
+            pub fn resolve() -> ::imping_runtime::Result<Signature> {
+                let address = FUNCTION.resolve()?;
+                // SAFETY: `resolve` returns the function's non-null address, and `init`'s caller promised the function has this type.
+                ::core::result::Result::Ok(unsafe {
+                    ::core::mem::transmute::<usize, Signature>(address)
+                })
+            }
+
             /// The function's address in this process.
             ///
             /// # Panics
             ///
-            /// If `game.exe`'s `init()` has not succeeded.
+            /// If `resolve()` fails, as it does before `game.exe`'s `init()`.
             pub fn ptr() -> Signature {
-                // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
-                unsafe {
-                    ::core::mem::transmute::<
-                        usize,
-                        Signature,
-                    >(super::super::MODULE.address(RVA))
+                match resolve() {
+                    ::core::result::Result::Ok(function) => function,
+                    ::core::result::Result::Err(error) => {
+                        ::core::panic!("imping: {error}")
+                    }
                 }
             }
 
@@ -1521,9 +1670,7 @@ pub mod game {
                 // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
                 unsafe {
                     ::imping_runtime::__private::install(
-                        &super::super::MODULE,
-                        RVA,
-                        &[],
+                        &FUNCTION,
                         &SLOT,
                         ::std::boxed::Box::new(detour),
                         thunk,
@@ -1552,18 +1699,40 @@ pub mod game {
                 fmt: ::imping_runtime::CStrPtr,
                 ...
             ) -> i32;
+            static FUNCTION: ::imping_runtime::__private::Function = ::imping_runtime::__private::Function::new(
+                &super::super::MODULE,
+                "util::Log",
+                RVA,
+                &[],
+                ::core::option::Option::None,
+            );
+
+            /// Finds the function in this process.
+            ///
+            /// That's `RVA`, unchecked, as there are no bytes to verify it by.
+            ///
+            /// # Errors
+            ///
+            /// Fails unless `game.exe`'s `init()` has succeeded.
+            pub fn resolve() -> ::imping_runtime::Result<Signature> {
+                let address = FUNCTION.resolve()?;
+                // SAFETY: `resolve` returns the function's non-null address, and `init`'s caller promised the function has this type.
+                ::core::result::Result::Ok(unsafe {
+                    ::core::mem::transmute::<usize, Signature>(address)
+                })
+            }
+
             /// The function's address in this process.
             ///
             /// # Panics
             ///
-            /// If `game.exe`'s `init()` has not succeeded.
+            /// If `resolve()` fails, as it does before `game.exe`'s `init()`.
             pub fn ptr() -> Signature {
-                // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
-                unsafe {
-                    ::core::mem::transmute::<
-                        usize,
-                        Signature,
-                    >(super::super::MODULE.address(RVA))
+                match resolve() {
+                    ::core::result::Result::Ok(function) => function,
+                    ::core::result::Result::Err(error) => {
+                        ::core::panic!("imping: {error}")
+                    }
                 }
             }
         }
@@ -1584,7 +1753,7 @@ pub mod game {
         ///
         /// # Panics
         ///
-        /// If `game.exe`'s `init()` has not succeeded.
+        /// If `Mixed::resolve()` fails, as it does before `game.exe`'s `init()`.
         pub unsafe fn Mixed(
             arg0: u32,
             original_2: u32,
@@ -1606,18 +1775,40 @@ pub mod game {
                 detour_2: bool,
                 r#type: *mut f32,
             ) -> u64;
+            static FUNCTION: ::imping_runtime::__private::Function = ::imping_runtime::__private::Function::new(
+                &super::super::MODULE,
+                "util::Mixed",
+                RVA,
+                &[],
+                ::core::option::Option::None,
+            );
+
+            /// Finds the function in this process.
+            ///
+            /// That's `RVA`, unchecked, as there are no bytes to verify it by.
+            ///
+            /// # Errors
+            ///
+            /// Fails unless `game.exe`'s `init()` has succeeded.
+            pub fn resolve() -> ::imping_runtime::Result<Signature> {
+                let address = FUNCTION.resolve()?;
+                // SAFETY: `resolve` returns the function's non-null address, and `init`'s caller promised the function has this type.
+                ::core::result::Result::Ok(unsafe {
+                    ::core::mem::transmute::<usize, Signature>(address)
+                })
+            }
+
             /// The function's address in this process.
             ///
             /// # Panics
             ///
-            /// If `game.exe`'s `init()` has not succeeded.
+            /// If `resolve()` fails, as it does before `game.exe`'s `init()`.
             pub fn ptr() -> Signature {
-                // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
-                unsafe {
-                    ::core::mem::transmute::<
-                        usize,
-                        Signature,
-                    >(super::super::MODULE.address(RVA))
+                match resolve() {
+                    ::core::result::Result::Ok(function) => function,
+                    ::core::result::Result::Err(error) => {
+                        ::core::panic!("imping: {error}")
+                    }
                 }
             }
 
@@ -1702,9 +1893,7 @@ pub mod game {
                 // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
                 unsafe {
                     ::imping_runtime::__private::install(
-                        &super::super::MODULE,
-                        RVA,
-                        &[],
+                        &FUNCTION,
                         &SLOT,
                         ::std::boxed::Box::new(detour),
                         thunk,
@@ -1721,7 +1910,7 @@ pub mod game {
         ///
         /// # Panics
         ///
-        /// If `game.exe`'s `init()` has not succeeded.
+        /// If `Release::resolve()` fails, as it does before `game.exe`'s `init()`.
         pub unsafe fn Release(memory: *mut ::core::ffi::c_void) {
             // SAFETY: forwarded to the caller.
             unsafe { Release::ptr()(memory) }
@@ -1736,18 +1925,40 @@ pub mod game {
                 memory: *mut ::core::ffi::c_void,
             );
 
+            static FUNCTION: ::imping_runtime::__private::Function = ::imping_runtime::__private::Function::new(
+                &super::super::MODULE,
+                "util::Release",
+                RVA,
+                &[],
+                ::core::option::Option::None,
+            );
+
+            /// Finds the function in this process.
+            ///
+            /// That's `RVA`, unchecked, as there are no bytes to verify it by.
+            ///
+            /// # Errors
+            ///
+            /// Fails unless `game.exe`'s `init()` has succeeded.
+            pub fn resolve() -> ::imping_runtime::Result<Signature> {
+                let address = FUNCTION.resolve()?;
+                // SAFETY: `resolve` returns the function's non-null address, and `init`'s caller promised the function has this type.
+                ::core::result::Result::Ok(unsafe {
+                    ::core::mem::transmute::<usize, Signature>(address)
+                })
+            }
+
             /// The function's address in this process.
             ///
             /// # Panics
             ///
-            /// If `game.exe`'s `init()` has not succeeded.
+            /// If `resolve()` fails, as it does before `game.exe`'s `init()`.
             pub fn ptr() -> Signature {
-                // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
-                unsafe {
-                    ::core::mem::transmute::<
-                        usize,
-                        Signature,
-                    >(super::super::MODULE.address(RVA))
+                match resolve() {
+                    ::core::result::Result::Ok(function) => function,
+                    ::core::result::Result::Err(error) => {
+                        ::core::panic!("imping: {error}")
+                    }
                 }
             }
 
@@ -1808,9 +2019,7 @@ pub mod game {
                 // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
                 unsafe {
                     ::imping_runtime::__private::install(
-                        &super::super::MODULE,
-                        RVA,
-                        &[],
+                        &FUNCTION,
                         &SLOT,
                         ::std::boxed::Box::new(detour),
                         thunk,
@@ -1827,7 +2036,7 @@ pub mod game {
         ///
         /// # Panics
         ///
-        /// If `game.exe`'s `init()` has not succeeded.
+        /// If `Store::resolve()` fails, as it does before `game.exe`'s `init()`.
         pub unsafe fn Store(holder: super::Holder) {
             // SAFETY: forwarded to the caller.
             unsafe { Store::ptr()(holder) }
@@ -1840,18 +2049,40 @@ pub mod game {
             /// The function's type.
             pub type Signature = unsafe extern "system" fn(holder: super::super::Holder);
 
+            static FUNCTION: ::imping_runtime::__private::Function = ::imping_runtime::__private::Function::new(
+                &super::super::MODULE,
+                "util::Store",
+                RVA,
+                &[],
+                ::core::option::Option::None,
+            );
+
+            /// Finds the function in this process.
+            ///
+            /// That's `RVA`, unchecked, as there are no bytes to verify it by.
+            ///
+            /// # Errors
+            ///
+            /// Fails unless `game.exe`'s `init()` has succeeded.
+            pub fn resolve() -> ::imping_runtime::Result<Signature> {
+                let address = FUNCTION.resolve()?;
+                // SAFETY: `resolve` returns the function's non-null address, and `init`'s caller promised the function has this type.
+                ::core::result::Result::Ok(unsafe {
+                    ::core::mem::transmute::<usize, Signature>(address)
+                })
+            }
+
             /// The function's address in this process.
             ///
             /// # Panics
             ///
-            /// If `game.exe`'s `init()` has not succeeded.
+            /// If `resolve()` fails, as it does before `game.exe`'s `init()`.
             pub fn ptr() -> Signature {
-                // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
-                unsafe {
-                    ::core::mem::transmute::<
-                        usize,
-                        Signature,
-                    >(super::super::MODULE.address(RVA))
+                match resolve() {
+                    ::core::result::Result::Ok(function) => function,
+                    ::core::result::Result::Err(error) => {
+                        ::core::panic!("imping: {error}")
+                    }
                 }
             }
 
@@ -1909,9 +2140,7 @@ pub mod game {
                 // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
                 unsafe {
                     ::imping_runtime::__private::install(
-                        &super::super::MODULE,
-                        RVA,
-                        &[],
+                        &FUNCTION,
                         &SLOT,
                         ::std::boxed::Box::new(detour),
                         thunk,
@@ -1933,7 +2162,7 @@ pub mod game {
             ///
             /// # Panics
             ///
-            /// If `game.exe`'s `init()` has not succeeded.
+            /// If `Tick::resolve()` fails, as it does before `game.exe`'s `init()`.
             pub unsafe fn Tick() {
                 // SAFETY: forwarded to the caller.
                 unsafe { Tick::ptr()() }
@@ -1946,18 +2175,40 @@ pub mod game {
                 /// The function's type.
                 pub type Signature = unsafe extern "system" fn();
 
+                static FUNCTION: ::imping_runtime::__private::Function = ::imping_runtime::__private::Function::new(
+                    &super::super::super::MODULE,
+                    "Game::World::Tick",
+                    RVA,
+                    &[],
+                    ::core::option::Option::None,
+                );
+
+                /// Finds the function in this process.
+                ///
+                /// That's `RVA`, unchecked, as there are no bytes to verify it by.
+                ///
+                /// # Errors
+                ///
+                /// Fails unless `game.exe`'s `init()` has succeeded.
+                pub fn resolve() -> ::imping_runtime::Result<Signature> {
+                    let address = FUNCTION.resolve()?;
+                    // SAFETY: `resolve` returns the function's non-null address, and `init`'s caller promised the function has this type.
+                    ::core::result::Result::Ok(unsafe {
+                        ::core::mem::transmute::<usize, Signature>(address)
+                    })
+                }
+
                 /// The function's address in this process.
                 ///
                 /// # Panics
                 ///
-                /// If `game.exe`'s `init()` has not succeeded.
+                /// If `resolve()` fails, as it does before `game.exe`'s `init()`.
                 pub fn ptr() -> Signature {
-                    // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
-                    unsafe {
-                        ::core::mem::transmute::<
-                            usize,
-                            Signature,
-                        >(super::super::super::MODULE.address(RVA))
+                    match resolve() {
+                        ::core::result::Result::Ok(function) => function,
+                        ::core::result::Result::Err(error) => {
+                            ::core::panic!("imping: {error}")
+                        }
                     }
                 }
 
@@ -2009,9 +2260,7 @@ pub mod game {
                     // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
                     unsafe {
                         ::imping_runtime::__private::install(
-                            &super::super::super::MODULE,
-                            RVA,
-                            &[],
+                            &FUNCTION,
                             &SLOT,
                             ::std::boxed::Box::new(detour),
                             thunk,
@@ -2030,7 +2279,7 @@ pub mod game {
         ///
         /// # Panics
         ///
-        /// If `game.exe`'s `init()` has not succeeded.
+        /// If `SetTitle::resolve()` fails, as it does before `game.exe`'s `init()`.
         pub fn SetTitle(title: &::imping_runtime::WString) {
             // SAFETY: the function is tagged `imping-safe` in the IR, which `init`'s caller vouched for: it needs only valid arguments and keeps none of the pointers, and the parameter types guarantee valid arguments.
             unsafe { SetTitle::ptr()(title.as_ptr()) }
@@ -2045,18 +2294,40 @@ pub mod game {
                 title: ::imping_runtime::WStrPtr,
             );
 
+            static FUNCTION: ::imping_runtime::__private::Function = ::imping_runtime::__private::Function::new(
+                &super::super::MODULE,
+                "ui::SetTitle",
+                RVA,
+                &[],
+                ::core::option::Option::None,
+            );
+
+            /// Finds the function in this process.
+            ///
+            /// That's `RVA`, unchecked, as there are no bytes to verify it by.
+            ///
+            /// # Errors
+            ///
+            /// Fails unless `game.exe`'s `init()` has succeeded.
+            pub fn resolve() -> ::imping_runtime::Result<Signature> {
+                let address = FUNCTION.resolve()?;
+                // SAFETY: `resolve` returns the function's non-null address, and `init`'s caller promised the function has this type.
+                ::core::result::Result::Ok(unsafe {
+                    ::core::mem::transmute::<usize, Signature>(address)
+                })
+            }
+
             /// The function's address in this process.
             ///
             /// # Panics
             ///
-            /// If `game.exe`'s `init()` has not succeeded.
+            /// If `resolve()` fails, as it does before `game.exe`'s `init()`.
             pub fn ptr() -> Signature {
-                // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
-                unsafe {
-                    ::core::mem::transmute::<
-                        usize,
-                        Signature,
-                    >(super::super::MODULE.address(RVA))
+                match resolve() {
+                    ::core::result::Result::Ok(function) => function,
+                    ::core::result::Result::Err(error) => {
+                        ::core::panic!("imping: {error}")
+                    }
                 }
             }
 
@@ -2114,9 +2385,7 @@ pub mod game {
                 // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
                 unsafe {
                     ::imping_runtime::__private::install(
-                        &super::super::MODULE,
-                        RVA,
-                        &[],
+                        &FUNCTION,
                         &SLOT,
                         ::std::boxed::Box::new(detour),
                         thunk,
@@ -2131,7 +2400,7 @@ pub mod game {
         ///
         /// # Panics
         ///
-        /// If `game.exe`'s `init()` has not succeeded.
+        /// If `Rename::resolve()` fails, as it does before `game.exe`'s `init()`.
         pub fn Rename(
             named: &mut super::Named,
             tag: &::core::ffi::CStr,
@@ -2157,18 +2426,40 @@ pub mod game {
                 tag: ::imping_runtime::CStrPtr,
                 data: *mut u8,
             ) -> super::super::LPCSTR;
+            static FUNCTION: ::imping_runtime::__private::Function = ::imping_runtime::__private::Function::new(
+                &super::super::MODULE,
+                "ui::Rename",
+                RVA,
+                &[],
+                ::core::option::Option::None,
+            );
+
+            /// Finds the function in this process.
+            ///
+            /// That's `RVA`, unchecked, as there are no bytes to verify it by.
+            ///
+            /// # Errors
+            ///
+            /// Fails unless `game.exe`'s `init()` has succeeded.
+            pub fn resolve() -> ::imping_runtime::Result<Signature> {
+                let address = FUNCTION.resolve()?;
+                // SAFETY: `resolve` returns the function's non-null address, and `init`'s caller promised the function has this type.
+                ::core::result::Result::Ok(unsafe {
+                    ::core::mem::transmute::<usize, Signature>(address)
+                })
+            }
+
             /// The function's address in this process.
             ///
             /// # Panics
             ///
-            /// If `game.exe`'s `init()` has not succeeded.
+            /// If `resolve()` fails, as it does before `game.exe`'s `init()`.
             pub fn ptr() -> Signature {
-                // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
-                unsafe {
-                    ::core::mem::transmute::<
-                        usize,
-                        Signature,
-                    >(super::super::MODULE.address(RVA))
+                match resolve() {
+                    ::core::result::Result::Ok(function) => function,
+                    ::core::result::Result::Err(error) => {
+                        ::core::panic!("imping: {error}")
+                    }
                 }
             }
 
@@ -2244,9 +2535,7 @@ pub mod game {
                 // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
                 unsafe {
                     ::imping_runtime::__private::install(
-                        &super::super::MODULE,
-                        RVA,
-                        &[],
+                        &FUNCTION,
                         &SLOT,
                         ::std::boxed::Box::new(detour),
                         thunk,
@@ -2264,7 +2553,7 @@ pub mod game {
         ///
         /// # Panics
         ///
-        /// If `game.exe`'s `init()` has not succeeded.
+        /// If `Normalize::resolve()` fails, as it does before `game.exe`'s `init()`.
         pub fn Normalize(v: super::Vector3) -> super::Vector3 {
             // SAFETY: the function is tagged `imping-safe` in the IR, which `init`'s caller vouched for: it needs only valid arguments and keeps none of the pointers, and the parameter types guarantee valid arguments.
             unsafe { Normalize::ptr()(v) }
@@ -2278,18 +2567,40 @@ pub mod game {
             pub type Signature = unsafe extern "system" fn(
                 v: super::super::Vector3,
             ) -> super::super::Vector3;
+            static FUNCTION: ::imping_runtime::__private::Function = ::imping_runtime::__private::Function::new(
+                &super::super::MODULE,
+                "math::Normalize",
+                RVA,
+                &[],
+                ::core::option::Option::None,
+            );
+
+            /// Finds the function in this process.
+            ///
+            /// That's `RVA`, unchecked, as there are no bytes to verify it by.
+            ///
+            /// # Errors
+            ///
+            /// Fails unless `game.exe`'s `init()` has succeeded.
+            pub fn resolve() -> ::imping_runtime::Result<Signature> {
+                let address = FUNCTION.resolve()?;
+                // SAFETY: `resolve` returns the function's non-null address, and `init`'s caller promised the function has this type.
+                ::core::result::Result::Ok(unsafe {
+                    ::core::mem::transmute::<usize, Signature>(address)
+                })
+            }
+
             /// The function's address in this process.
             ///
             /// # Panics
             ///
-            /// If `game.exe`'s `init()` has not succeeded.
+            /// If `resolve()` fails, as it does before `game.exe`'s `init()`.
             pub fn ptr() -> Signature {
-                // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
-                unsafe {
-                    ::core::mem::transmute::<
-                        usize,
-                        Signature,
-                    >(super::super::MODULE.address(RVA))
+                match resolve() {
+                    ::core::result::Result::Ok(function) => function,
+                    ::core::result::Result::Err(error) => {
+                        ::core::panic!("imping: {error}")
+                    }
                 }
             }
 
@@ -2352,9 +2663,7 @@ pub mod game {
                 // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
                 unsafe {
                     ::imping_runtime::__private::install(
-                        &super::super::MODULE,
-                        RVA,
-                        &[],
+                        &FUNCTION,
                         &SLOT,
                         ::std::boxed::Box::new(detour),
                         thunk,
@@ -2517,7 +2826,7 @@ pub mod game {
         ///
         /// # Panics
         ///
-        /// If `game.exe`'s `init()` has not succeeded.
+        /// If `Spawn::resolve()` fails, as it does before `game.exe`'s `init()`.
         pub unsafe fn Spawn(
             actor: *mut super::actors::Actor,
             Rank_: super::actors::Rank,
@@ -2537,18 +2846,40 @@ pub mod game {
                 Rank_: super::super::actors::Rank,
                 RVA_: u32,
             ) -> *mut super::super::actors::Player;
+            static FUNCTION: ::imping_runtime::__private::Function = ::imping_runtime::__private::Function::new(
+                &super::super::MODULE,
+                "actors::Spawn",
+                RVA,
+                &[],
+                ::core::option::Option::None,
+            );
+
+            /// Finds the function in this process.
+            ///
+            /// That's `RVA`, unchecked, as there are no bytes to verify it by.
+            ///
+            /// # Errors
+            ///
+            /// Fails unless `game.exe`'s `init()` has succeeded.
+            pub fn resolve() -> ::imping_runtime::Result<Signature> {
+                let address = FUNCTION.resolve()?;
+                // SAFETY: `resolve` returns the function's non-null address, and `init`'s caller promised the function has this type.
+                ::core::result::Result::Ok(unsafe {
+                    ::core::mem::transmute::<usize, Signature>(address)
+                })
+            }
+
             /// The function's address in this process.
             ///
             /// # Panics
             ///
-            /// If `game.exe`'s `init()` has not succeeded.
+            /// If `resolve()` fails, as it does before `game.exe`'s `init()`.
             pub fn ptr() -> Signature {
-                // SAFETY: `address` panics unless `init` succeeded, so this is the function's non-null address, and `init`'s caller promised the function has this type.
-                unsafe {
-                    ::core::mem::transmute::<
-                        usize,
-                        Signature,
-                    >(super::super::MODULE.address(RVA))
+                match resolve() {
+                    ::core::result::Result::Ok(function) => function,
+                    ::core::result::Result::Err(error) => {
+                        ::core::panic!("imping: {error}")
+                    }
                 }
             }
 
@@ -2628,9 +2959,7 @@ pub mod game {
                 // SAFETY: `thunk` has type `Signature` and calls the slot's closure; `init`'s caller promised the function has that type, and `install` fails unless `init` succeeded.
                 unsafe {
                     ::imping_runtime::__private::install(
-                        &super::super::MODULE,
-                        RVA,
-                        &[],
+                        &FUNCTION,
                         &SLOT,
                         ::std::boxed::Box::new(detour),
                         thunk,
