@@ -49,12 +49,6 @@ pub(crate) fn module(
         }
     }
     let code = functions::emit(&table, &layouts, root, warnings);
-    for vtable in &module.vtables {
-        warnings.push(Warning::VtableSkipped {
-            module: module.name.clone(),
-            name: qualified(&vtable.namespace, &vtable.name),
-        });
-    }
 
     let architecture = match module.architecture {
         Architecture::X86 => "x86",

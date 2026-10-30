@@ -780,6 +780,8 @@ pub mod game {
             "GetPlayer",
             RVA,
             &[],
+            "",
+            ::core::option::Option::None,
             ::core::option::Option::None,
         );
 
@@ -895,6 +897,8 @@ pub mod game {
             "init",
             RVA,
             &[],
+            "",
+            ::core::option::Option::None,
             ::core::option::Option::None,
         );
 
@@ -1018,6 +1022,8 @@ pub mod game {
             "Teleport",
             RVA,
             &[],
+            "",
+            ::core::option::Option::None,
             ::core::option::Option::None,
         );
 
@@ -1183,20 +1189,26 @@ pub mod game {
                 "Entity::Update",
                 RVA,
                 VERIFICATION,
+                "48 83 ec 28",
                 ::core::option::Option::Some(::imping_runtime::__private::Pattern {
                     bytes: "e8 ?? ?? ?? ?? 48 8b d8",
                     offset: 0,
                     follow_call: true,
                 }),
+                ::core::option::Option::Some(::imping_runtime::__private::VtableSlot {
+                    type_name: ".?AVEntity@@",
+                    offset: 0,
+                    index: 2,
+                }),
             );
 
             /// Finds the function in this process.
             ///
-            /// On a build `game.exe`'s `init()` accepts, that's `RVA`. On another, the first call checks the bytes there against `VERIFICATION`, and if they differ, finds the function by its byte pattern instead.
+            /// On a build `game.exe`'s `init()` accepts, that's `RVA`. On another, the first call checks the bytes there against `VERIFICATION`, and if they differ, finds the function by its byte pattern or its class's vtable instead.
             ///
             /// # Errors
             ///
-            /// Fails unless `game.exe`'s `init()` has succeeded, or on a build it doesn't accept, if the first bytes differ from `VERIFICATION` and its byte pattern doesn't find the function.
+            /// Fails unless `game.exe`'s `init()` has succeeded, or on a build it doesn't accept, if the first bytes differ from `VERIFICATION` and it can't be found by its byte pattern or its class's vtable.
             pub fn resolve() -> ::imping_runtime::Result<Signature> {
                 let address = FUNCTION.resolve()?;
                 // SAFETY: `resolve` returns the function's non-null address, and `init`'s caller promised the function has this type.
@@ -1268,7 +1280,7 @@ pub mod game {
             ///
             /// # Errors
             ///
-            /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, if its first bytes differ from `VERIFICATION` and its byte pattern doesn't find it elsewhere, or if patching fails.
+            /// Fails unless `game.exe`'s `init()` has succeeded, if this mod already holds a hook on the function, if its first bytes differ from `VERIFICATION` and it can't be found by its byte pattern or its class's vtable, or if patching fails.
             pub fn hook(
                 detour: impl for<'call> Fn(
                     Original<'call>,
@@ -1317,6 +1329,8 @@ pub mod game {
                 "Entity::Damage",
                 RVA,
                 &[],
+                "",
+                ::core::option::Option::None,
                 ::core::option::Option::None,
             );
 
@@ -1448,6 +1462,8 @@ pub mod game {
                 "Entity::Damage",
                 RVA,
                 &[],
+                "",
+                ::core::option::Option::None,
                 ::core::option::Option::None,
             );
 
@@ -1579,6 +1595,8 @@ pub mod game {
                 "Entity::Entity",
                 RVA,
                 &[],
+                "",
+                ::core::option::Option::None,
                 ::core::option::Option::None,
             );
 
@@ -1704,6 +1722,8 @@ pub mod game {
                 "util::Log",
                 RVA,
                 &[],
+                "",
+                ::core::option::Option::None,
                 ::core::option::Option::None,
             );
 
@@ -1780,6 +1800,8 @@ pub mod game {
                 "util::Mixed",
                 RVA,
                 &[],
+                "",
+                ::core::option::Option::None,
                 ::core::option::Option::None,
             );
 
@@ -1930,6 +1952,8 @@ pub mod game {
                 "util::Release",
                 RVA,
                 &[],
+                "",
+                ::core::option::Option::None,
                 ::core::option::Option::None,
             );
 
@@ -2054,6 +2078,8 @@ pub mod game {
                 "util::Store",
                 RVA,
                 &[],
+                "",
+                ::core::option::Option::None,
                 ::core::option::Option::None,
             );
 
@@ -2180,6 +2206,8 @@ pub mod game {
                     "Game::World::Tick",
                     RVA,
                     &[],
+                    "",
+                    ::core::option::Option::None,
                     ::core::option::Option::None,
                 );
 
@@ -2299,6 +2327,8 @@ pub mod game {
                 "ui::SetTitle",
                 RVA,
                 &[],
+                "",
+                ::core::option::Option::None,
                 ::core::option::Option::None,
             );
 
@@ -2431,6 +2461,8 @@ pub mod game {
                 "ui::Rename",
                 RVA,
                 &[],
+                "",
+                ::core::option::Option::None,
                 ::core::option::Option::None,
             );
 
@@ -2572,6 +2604,8 @@ pub mod game {
                 "math::Normalize",
                 RVA,
                 &[],
+                "",
+                ::core::option::Option::None,
                 ::core::option::Option::None,
             );
 
@@ -2851,6 +2885,8 @@ pub mod game {
                 "actors::Spawn",
                 RVA,
                 &[],
+                "",
+                ::core::option::Option::None,
                 ::core::option::Option::None,
             );
 

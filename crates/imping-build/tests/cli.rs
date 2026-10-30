@@ -32,8 +32,8 @@ fn text(bytes: &[u8]) -> String {
     String::from_utf8(bytes.to_vec()).expect("UTF-8 output")
 }
 
-const VTABLE_WARNING: &str =
-    "warning: `game.exe` vtable `Entity` skipped; vtables are not supported yet";
+const WARNING: &str =
+    "warning: `game.exe` function `math::Blend` uses custom storage; only its RVA is generated";
 
 #[test]
 fn generate_writes_to_standard_output_and_warns_on_standard_error() {
@@ -46,7 +46,7 @@ fn generate_writes_to_standard_output_and_warns_on_standard_error() {
     );
     assert!(stdout.contains(&format!("// Source: {}", fixture())));
     assert!(stdout.contains("pub mod game {"));
-    assert!(text(&output.stderr).contains(VTABLE_WARNING));
+    assert!(text(&output.stderr).contains(WARNING));
 }
 
 #[test]
@@ -62,7 +62,7 @@ fn generate_writes_a_file_with_renamed_modules() {
     ]);
     assert!(output.status.success(), "{output:?}");
     assert!(output.stdout.is_empty());
-    assert!(text(&output.stderr).contains(VTABLE_WARNING));
+    assert!(text(&output.stderr).contains(WARNING));
     let written = std::fs::read_to_string(&out).expect("output file");
     assert!(written.contains("pub mod old_game {"));
 }
@@ -71,7 +71,7 @@ fn generate_writes_a_file_with_renamed_modules() {
 fn check_prints_warnings_and_a_summary() {
     let output = imping(&["check", &fixture()]);
     assert!(output.status.success(), "{output:?}");
-    assert!(text(&output.stderr).contains(VTABLE_WARNING));
+    assert!(text(&output.stderr).contains(WARNING));
     assert_eq!(
         text(&output.stdout),
         format!("`{}` generates bindings (1 warning)\n", fixture())

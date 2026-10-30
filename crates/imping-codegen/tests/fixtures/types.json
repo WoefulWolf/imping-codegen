@@ -188,7 +188,7 @@
             { "name": "this", "type": 16, "storage": { "kind": "register", "value": "rcx" } },
             { "name": "dt", "type": 8, "storage": { "kind": "register", "value": "xmm1" } }
           ],
-          "tags": ["hot", "ai"], "verification": "4883ec28",
+          "tags": ["hot", "ai"], "verification": "4883ec28", "shape": "48 83 ec 28",
           "pattern": { "bytes": "e8 ?? ?? ?? ?? 48 8b d8", "follow_call": true } },
         { "name": "Damage", "namespace": ["Entity"], "rva": "0x15400",
           "calling_convention": "win64", "return_type": 0,
@@ -295,7 +295,17 @@
       ],
       "vtables": [
         { "name": "Entity", "namespace": ["game"], "rva": "0x3b0040",
-          "entries": [ { "index": 0, "name": "Destructor", "rva": "0x15000" } ] }
+          "rtti": { "type_name": ".?AVEntity@game@@" },
+          "entries": [
+            { "index": 0, "name": "Destructor", "rva": "0x15000" },
+            { "index": 1, "name": "Update", "rva": "0x15040" }
+          ] },
+        { "name": "vftable", "namespace": ["Entity"], "rva": "0x3b0080",
+          "rtti": { "type_name": ".?AVEntity@@" },
+          "entries": [
+            { "index": 0, "name": "Destructor", "rva": "0x15000" },
+            { "index": 2, "name": "Update", "rva": "0x15040" }
+          ] }
       ]
     }
   ]

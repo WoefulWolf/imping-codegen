@@ -22,6 +22,11 @@
           "calling_convention": "win64", "return_type": 0,
           "parameters": [
             { "name": "v", "type": 3, "storage": { "kind": "register", "value": "rcx" } }
+          ] },
+        { "name": "Blend", "namespace": ["math"], "rva": "0x14300",
+          "calling_convention": "win64", "return_type": 0, "custom_storage": true,
+          "parameters": [
+            { "name": "v", "type": 3, "storage": { "kind": "register", "value": "rax" } }
           ] }
       ],
       "globals": [

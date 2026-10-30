@@ -13,7 +13,7 @@ use crate::layout::Layouts;
 use crate::names::{self, Scope, doc_name, ident};
 use crate::namespaces::Namespace;
 use crate::types::{self, Text, TypeTable};
-use imping_ir::{Function, Global, TypeId, TypeKind};
+use imping_ir::{Function, Global, Module, Rtti, TypeId, TypeKind};
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use std::collections::{HashMap, HashSet};
@@ -81,12 +81,14 @@ pub(crate) fn emit(
         values.entry(namespace).or_default().insert(name);
     }
     let no_values = HashSet::new();
+    let slots = vtable_slots(module);
 
     for (function, name) in module.functions.iter().zip(&function_names) {
         let taken = values
             .get(function.namespace.as_slice())
             .unwrap_or(&no_values);
-        let item = emit_function(table, layouts, function, name, taken, warnings);
+        let slot = slot(&slots, function);
+        let item = emit_function(table, layouts, function, name, taken, slot, warnings);
         root.at(&function.namespace).items.push(item);
     }
     for (global, name) in module.globals.iter().zip(&global_names) {
@@ -269,6 +271,44 @@ fn parameters(
     Ok(parameters)
 }
 
+/// A vtable slot a function is in: its vtable's namespace and RVA, the class's
+/// RTTI, and the slot's index.
+type Slot<'a> = (&'a [String], u32, &'a Rtti, u32);
+
+/// Returns the RTTI vtable slots each function address is in.
+fn vtable_slots(module: &Module) -> HashMap<u32, Vec<Slot<'_>>> {
+    let mut slots: HashMap<u32, Vec<Slot<'_>>> = HashMap::new();
+    for vtable in &module.vtables {
+        let Some(rtti) = &vtable.rtti else {
+            continue;
+        };
+        for entry in &vtable.entries {
+            slots.entry(entry.rva).or_default().push((
+                vtable.namespace.as_slice(),
+                vtable.rva,
+                rtti,
+                entry.index,
+            ));
+        }
+    }
+    slots
+}
+
+/// Picks the slot a function is found through when its RVA and pattern fail:
+/// in its own class's vtable if it's there, otherwise the first vtable holding
+/// it. Only for functions with a shape, which checks the slot still holds it.
+fn slot<'a>(slots: &HashMap<u32, Vec<Slot<'a>>>, function: &Function) -> Option<Slot<'a>> {
+    if function.shape.is_empty() {
+        return None;
+    }
+    let candidates = slots.get(&function.rva)?;
+    candidates
+        .iter()
+        .find(|(namespace, ..)| *namespace == function.namespace.as_slice())
+        .or_else(|| candidates.iter().min_by_key(|(_, rva, ..)| *rva))
+        .copied()
+}
+
 /// Emits one function: the call wrapper and its module, or as much of them as
 /// the function allows.
 fn emit_function(
@@ -277,6 +317,7 @@ fn emit_function(
     function: &Function,
     name: &str,
     taken: &HashSet<&str>,
+    slot: Option<Slot<'_>>,
     warnings: &mut Vec<Warning>,
 ) -> TokenStream {
     let module = table.module();
@@ -368,8 +409,14 @@ fn emit_function(
             pub const VERIFICATION: &[u8] = &[#(#bytes),*];
         }
     });
-    let function_item = function_item(function, &qualified_name, verified, &to_root);
-    let resolve_item = resolve_item(&file, verified, function.pattern.is_some());
+    let function_item = function_item(function, &qualified_name, verified, slot, &to_root);
+    let fallback = match (function.pattern.is_some(), slot.is_some()) {
+        (true, true) => Some("by its byte pattern or its class's vtable"),
+        (true, false) => Some("by its byte pattern"),
+        (false, true) => Some("through its class's vtable"),
+        (false, false) => None,
+    };
+    let resolve_item = resolve_item(&file, verified, fallback);
     let ptr_doc = docs(&[
         "The function's address in this process.".to_owned(),
         "# Panics".to_owned(),
@@ -411,7 +458,7 @@ fn emit_function(
             &shown,
             &file,
             verified,
-            function.pattern.is_some(),
+            fallback,
         )
     } else {
         warnings.push(Warning::HookUnavailable {
@@ -519,6 +566,7 @@ fn function_item(
     function: &Function,
     qualified_name: &str,
     verified: bool,
+    slot: Option<Slot<'_>>,
     to_root: &TokenStream,
 ) -> TokenStream {
     let verification = if verified {
@@ -541,6 +589,22 @@ fn function_item(
         }
         None => quote! { ::core::option::Option::None },
     };
+    let shape = &function.shape;
+    let slot = match slot {
+        Some((_, _, rtti, index)) => {
+            let type_name = &rtti.type_name;
+            let offset = proc_macro2::Literal::u32_unsuffixed(rtti.offset);
+            let index = proc_macro2::Literal::u32_unsuffixed(index);
+            quote! {
+                ::core::option::Option::Some(::imping_runtime::__private::VtableSlot {
+                    type_name: #type_name,
+                    offset: #offset,
+                    index: #index,
+                })
+            }
+        }
+        None => quote! { ::core::option::Option::None },
+    };
     quote! {
         static FUNCTION: ::imping_runtime::__private::Function =
             ::imping_runtime::__private::Function::new(
@@ -548,13 +612,15 @@ fn function_item(
                 #qualified_name,
                 RVA,
                 #verification,
+                #shape,
                 #pattern,
+                #slot,
             );
     }
 }
 
 /// Returns a function's `resolve()`.
-fn resolve_item(file: &str, verified: bool, has_pattern: bool) -> TokenStream {
+fn resolve_item(file: &str, verified: bool, fallback: Option<&str>) -> TokenStream {
     let (how, errors) = if verified {
         let mut how = format!(
             "On a build `{file}`'s `init()` accepts, that's `RVA`. On another, the first call \
@@ -564,9 +630,11 @@ fn resolve_item(file: &str, verified: bool, has_pattern: bool) -> TokenStream {
             "Fails unless `{file}`'s `init()` has succeeded, or on a build it doesn't accept, \
              if the first bytes differ from `VERIFICATION`"
         );
-        if has_pattern {
-            how.push_str(", and if they differ, finds the function by its byte pattern instead");
-            errors.push_str(" and its byte pattern doesn't find the function");
+        if let Some(fallback) = fallback {
+            how.push_str(&format!(
+                ", and if they differ, finds the function {fallback} instead"
+            ));
+            errors.push_str(&format!(" and it can't be found {fallback}"));
         }
         how.push('.');
         errors.push('.');
@@ -602,7 +670,7 @@ fn hook_items(
     shown: &str,
     file: &str,
     verified: bool,
-    has_pattern: bool,
+    fallback: Option<&str>,
 ) -> TokenStream {
     let types: Vec<&TokenStream> = parameters
         .iter()
@@ -620,8 +688,8 @@ fn hook_items(
     );
     if verified {
         errors.push_str(", if its first bytes differ from `VERIFICATION`");
-        if has_pattern {
-            errors.push_str(" and its byte pattern doesn't find it elsewhere");
+        if let Some(fallback) = fallback {
+            errors.push_str(&format!(" and it can't be found {fallback}"));
         }
     }
     errors.push_str(", or if patching fails.");

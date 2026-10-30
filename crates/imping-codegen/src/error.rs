@@ -73,13 +73,6 @@ impl core::error::Error for Error {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Warning {
-    /// A vtable was skipped, since vtables aren't supported.
-    VtableSkipped {
-        /// The IR module the vtable is in.
-        module: String,
-        /// The vtable's name, including its namespace.
-        name: String,
-    },
     /// A function uses custom argument storage, so only its RVA is generated.
     CustomStorage {
         /// The IR module the function is in.
@@ -147,10 +140,6 @@ pub enum Warning {
 impl fmt::Display for Warning {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Warning::VtableSkipped { module, name } => write!(
-                f,
-                "`{module}` vtable `{name}` skipped; vtables are not supported yet"
-            ),
             Warning::CustomStorage { module, function } => write!(
                 f,
                 "`{module}` function `{function}` uses custom storage; only its RVA is generated"

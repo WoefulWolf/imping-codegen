@@ -45,7 +45,7 @@ fn generate_to_writes_bindings_with_a_source_line_and_returns_warnings() {
     let warnings: Vec<String> = warnings.iter().map(ToString::to_string).collect();
     assert_eq!(
         warnings,
-        ["`game.exe` vtable `Entity` skipped; vtables are not supported yet"]
+        ["`game.exe` function `math::Blend` uses custom storage; only its RVA is generated"]
     );
 }
 
@@ -186,7 +186,7 @@ fn generate_writes_to_out_dir_and_prints_cargo_lines() {
     );
     assert!(
         stdout.contains(
-            "cargo:warning=imping: `game.exe` vtable `Entity` skipped; vtables are not supported yet\n"
+            "cargo:warning=imping: `game.exe` function `math::Blend` uses custom storage; only its RVA is generated\n"
         ),
         "{stdout}"
     );

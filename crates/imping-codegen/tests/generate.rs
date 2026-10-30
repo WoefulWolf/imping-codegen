@@ -52,7 +52,6 @@ fn types_x64() {
              unsafe: parameter `memory` is a `void` pointer",
             "`game.exe` function `util::Store` is tagged `imping-safe` but its call stays unsafe: \
              parameter `holder` is passed by value and contains pointers",
-            "`game.exe` vtable `game::Entity` skipped; vtables are not supported yet",
         ]
     );
     assert_eq!(
