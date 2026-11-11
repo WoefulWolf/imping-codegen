@@ -1,17 +1,25 @@
 //! Generates Rust bindings from imping IR files, from a build script or the
 //! command line.
 //!
-//! [`Builder`] reads an IR file, generates bindings with `imping-codegen` and
-//! writes them. Failures are an [`Error`] naming the file involved.
+//! [`Builder`] reads the IR file of each build of the target, generates one set
+//! of bindings for them with `imping-codegen` and writes it. Failures are an
+//! [`Error`] naming the file involved.
 //!
 //! # From a build script
 //!
 //! ```no_run
 //! // build.rs
 //! fn main() -> Result<(), imping_build::Error> {
-//!     imping_build::Builder::new("ir/target.json").generate()
+//!     imping_build::Builder::new()
+//!         .ir("steam", "ir/target.json")
+//!         .generate()
 //! }
 //! ```
+//!
+//! Each IR file gets a label, which names its build in the bindings: here
+//! `target::Build::Steam` and constants such as `RVA_STEAM`. For several
+//! builds, add an `ir` per build; see
+//! [Several builds](imping_codegen#several-builds).
 //!
 //! [`Builder::generate`] writes `$OUT_DIR/imped.rs` for the crate to include:
 //!
@@ -25,9 +33,10 @@
 //!
 //! ```text
 //! cargo install --path crates/imping-build --features cli
-//! imping generate ir/target.json -o src/imped.rs --module-name TargetCore.dll=target
-//! imping generate ir/target.json -o src/imped.rs --accept-build target.exe=0x64b8f2a1:0xa3c000
-//! imping check ir/target.json
+//! imping generate --ir steam=ir/target.json -o src/imped.rs --module-name TargetCore.dll=target
+//! imping generate --ir steam_2021=ir/2021.json --ir steam_2026=ir/2026.json -o src/imped.rs
+//! imping generate --ir steam=ir/target.json --accept-build steam:target.exe=0x64b8f2a1:0xa3c000
+//! imping check --ir steam=ir/target.json
 //! ```
 
 mod error;
@@ -45,40 +54,59 @@ use std::path::{Path, PathBuf};
 /// The default name of the file [`Builder::generate`] writes to `OUT_DIR`.
 const DEFAULT_OUT_FILE: &str = "imped.rs";
 
-/// Generates bindings from one IR file.
+/// Generates one set of bindings from the IR files of one or more builds.
 ///
-/// Create one with [`Builder::new`], optionally configure it, then call
+/// Create one with [`Builder::new`], add each build's IR file with
+/// [`ir`](Self::ir), optionally configure it, then call
 /// [`generate`](Self::generate) from a build script or
 /// [`generate_to`](Self::generate_to) anywhere else.
 ///
 /// # Examples
 ///
 /// ```no_run
-/// // build.rs, for a packed `target.exe` that keeps its timestamp but grows
-/// // the image.
+/// // build.rs, for two builds of `target.exe`, the first also as a packed
+/// // image that keeps its timestamp but grows the image.
 /// fn main() -> Result<(), imping_build::Error> {
-///     imping_build::Builder::new("ir/target.json")
-///         .accept_build("target.exe", 0x64b8f2a1, 0xa3c000)
+///     imping_build::Builder::new()
+///         .ir("steam_2021", "ir/target-2021.json")
+///         .ir("steam_2026", "ir/target-2026.json")
+///         .accept_build("steam_2021", "target.exe", 0x64b8f2a1, 0xa3c000)
 ///         .generate()
 /// }
 /// ```
 #[derive(Debug, Clone)]
 pub struct Builder {
-    ir_path: PathBuf,
+    /// Each build's label and IR file, in call order.
+    irs: Vec<(String, PathBuf)>,
     generator: Generator,
     out_file: PathBuf,
 }
 
+impl Default for Builder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Builder {
-    /// Creates a builder for the IR file at `ir_path`.
-    ///
-    /// In a build script, a relative path is relative to the crate's root.
-    pub fn new(ir_path: impl Into<PathBuf>) -> Self {
+    /// Creates a builder with no IR files yet.
+    pub fn new() -> Self {
         Self {
-            ir_path: ir_path.into(),
+            irs: Vec::new(),
             generator: Generator::new(),
             out_file: PathBuf::from(DEFAULT_OUT_FILE),
         }
+    }
+
+    /// Adds the IR file of the build labelled `label`, such as `steam_2021`.
+    ///
+    /// The label names the build in the bindings: a `Build::Steam2021` variant
+    /// and constants such as `RVA_STEAM_2021`. Labels are lowercase letters,
+    /// digits and single underscores, starting with a letter. In a build
+    /// script, a relative path is relative to the crate's root.
+    pub fn ir(mut self, label: impl Into<String>, path: impl Into<PathBuf>) -> Self {
+        self.irs.push((label.into(), path.into()));
+        self
     }
 
     /// Names the Rust module generated for the IR module `ir_name`.
@@ -89,24 +117,28 @@ impl Builder {
         self
     }
 
-    /// Makes the generated `init()` of the IR module `ir_name` also accept the
-    /// build with this timestamp and image size.
+    /// Makes the generated `init()` of the IR module `ir_name` also accept, as
+    /// the build labelled `label`, the image with this timestamp and image
+    /// size.
     ///
     /// See [`imping_codegen::Generator::accept_build`] for when that's sound.
     pub fn accept_build(
         mut self,
+        label: impl Into<String>,
         ir_name: impl Into<String>,
         timestamp: u32,
         image_size: u32,
     ) -> Self {
-        self.generator = self.generator.accept_build(ir_name, timestamp, image_size);
+        self.generator = self
+            .generator
+            .accept_build(label, ir_name, timestamp, image_size);
         self
     }
 
     /// Sets the file name [`generate`](Self::generate) writes in `OUT_DIR`,
     /// `imped.rs` by default.
     ///
-    /// Use it to keep the bindings of several IR files apart.
+    /// Use it to keep several sets of bindings apart.
     pub fn out_file(mut self, name: impl Into<PathBuf>) -> Self {
         self.out_file = name.into();
         self
@@ -115,7 +147,7 @@ impl Builder {
     /// Generates the bindings into `$OUT_DIR/imped.rs`, or the name set with
     /// [`out_file`](Self::out_file).
     ///
-    /// For build scripts: also prints `cargo:rerun-if-changed` for the IR file
+    /// For build scripts: also prints `cargo:rerun-if-changed` for each IR file
     /// and one `cargo:warning` per [`Warning`].
     ///
     /// # Errors
@@ -124,7 +156,9 @@ impl Builder {
     /// [`generate_to`](Self::generate_to).
     pub fn generate(&self) -> Result<(), Error> {
         let out_dir = std::env::var_os("OUT_DIR").ok_or(Error::OutDirNotSet)?;
-        println!("cargo:rerun-if-changed={}", self.ir_path.display());
+        for (_, path) in &self.irs {
+            println!("cargo:rerun-if-changed={}", path.display());
+        }
         let warnings = self.generate_to(Path::new(&out_dir).join(&self.out_file))?;
         for warning in warnings {
             println!("cargo:warning=imping: {warning}");
@@ -149,58 +183,83 @@ impl Builder {
         Ok(warnings)
     }
 
-    /// Reads the IR and generates the bindings, with the `// Source:` line
-    /// added to the header.
+    /// Reads the IR files and generates the bindings, with a `// Source:` line
+    /// per file added to the header.
     pub(crate) fn render(&self) -> Result<(String, Vec<Warning>), Error> {
-        let path = || self.ir_path.clone();
-        let text = std::fs::read_to_string(&self.ir_path).map_err(|source| Error::Read {
-            path: path(),
-            source,
-        })?;
-        let ir = Ir::from_json_str(&text).map_err(|source| Error::Parse {
-            path: path(),
-            source,
-        })?;
+        let mut irs = Vec::with_capacity(self.irs.len());
+        for (_, path) in &self.irs {
+            let text = std::fs::read_to_string(path).map_err(|source| Error::Read {
+                path: path.clone(),
+                source,
+            })?;
+            let ir = Ir::from_json_str(&text).map_err(|source| Error::Parse {
+                path: path.clone(),
+                source,
+            })?;
+            irs.push(ir);
+        }
+        let builds: Vec<(&str, &Ir)> = self
+            .irs
+            .iter()
+            .zip(&irs)
+            .map(|((label, _), ir)| (label.as_str(), ir))
+            .collect();
         let bindings = self
             .generator
-            .generate(&ir)
+            .generate(&builds)
             .map_err(|source| Error::Generate {
-                path: path(),
+                path: self
+                    .irs
+                    .first()
+                    .map(|(_, path)| path.clone())
+                    .unwrap_or_default(),
                 source,
             })?;
         let warnings = bindings.warnings().to_vec();
-        let source = with_source_line(bindings.into_source(), &self.ir_path);
+        let source = with_source_lines(bindings.into_source(), &self.irs);
         Ok((source, warnings))
     }
 }
 
-/// Adds `// Source: <path>` after the generated file's first header line.
-fn with_source_line(source: String, ir_path: &Path) -> String {
-    let line = format!("// Source: {}\n", ir_path.display());
+/// Adds `// Source: <path> (<label>)` for each IR file after the generated
+/// file's first header line.
+fn with_source_lines(source: String, irs: &[(String, PathBuf)]) -> String {
+    let lines: String = irs
+        .iter()
+        .map(|(label, path)| format!("// Source: {} ({label})\n", path.display()))
+        .collect();
     match source.find('\n') {
         Some(end) => {
-            let mut out = String::with_capacity(source.len() + line.len());
+            let mut out = String::with_capacity(source.len() + lines.len());
             out.push_str(&source[..=end]);
-            out.push_str(&line);
+            out.push_str(&lines);
             out.push_str(&source[end + 1..]);
             out
         }
-        None => format!("{source}\n{line}"),
+        None => format!("{source}\n{lines}"),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::with_source_line;
-    use std::path::Path;
+    use super::with_source_lines;
+    use std::path::PathBuf;
 
     #[test]
-    fn the_source_line_follows_the_first_header_line() {
+    fn the_source_lines_follow_the_first_header_line() {
         let source =
             "// Generated by imping-codegen 0.1.0. Do not edit.\n\npub mod game {}\n".to_owned();
+        let irs = [
+            ("steam_2021".to_owned(), PathBuf::from("ir/2021.json")),
+            ("steam_2026".to_owned(), PathBuf::from("ir/2026.json")),
+        ];
         assert_eq!(
-            with_source_line(source, Path::new("ir/game.json")),
-            "// Generated by imping-codegen 0.1.0. Do not edit.\n// Source: ir/game.json\n\npub mod game {}\n"
+            with_source_lines(source, &irs),
+            "// Generated by imping-codegen 0.1.0. Do not edit.\n\
+             // Source: ir/2021.json (steam_2021)\n\
+             // Source: ir/2026.json (steam_2026)\n\
+             \n\
+             pub mod game {}\n"
         );
     }
 }

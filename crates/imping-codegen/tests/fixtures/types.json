@@ -276,7 +276,7 @@
           "parameters": [
             { "name": "actor", "type": 67, "storage": { "kind": "register", "value": "rcx" } },
             { "name": "Rank", "type": 66, "storage": { "kind": "register", "value": "edx" } },
-            { "name": "RVA", "type": 6, "storage": { "kind": "register", "value": "r8d" } }
+            { "name": "RVA_STEAM", "type": 6, "storage": { "kind": "register", "value": "r8d" } }
           ] },
         { "name": "Teleport", "rva": "0x16300", "calling_convention": "win64",
           "return_type": 0,

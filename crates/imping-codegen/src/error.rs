@@ -4,6 +4,8 @@ use core::fmt;
 use imping_ir::ValidationErrors;
 
 /// Why [`Generator::generate`](crate::Generator::generate) failed.
+///
+/// Messages name the module, item or build involved.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum Error {
@@ -33,6 +35,61 @@ pub enum Error {
         /// The Rust module name given.
         name: String,
     },
+    /// Two builds have the same label, or labels that make the same `Build`
+    /// variant.
+    DuplicateBuild {
+        /// The second build's label.
+        label: String,
+    },
+    /// A build's label isn't lowercase letters, digits and single
+    /// underscores, starting with a letter.
+    InvalidBuildLabel {
+        /// The label given.
+        label: String,
+    },
+    /// [`Generator::accept_build`](crate::Generator::accept_build) names a
+    /// build label no IR has.
+    UnknownBuild {
+        /// The label given.
+        label: String,
+    },
+    /// Two builds' IRs disagree on a type, a function's signature or a
+    /// global's type, so one set of bindings can't fit both.
+    BuildsDiffer(Box<BuildsDiffer>),
+}
+
+/// What two builds' IRs disagree on; see [`Error::BuildsDiffer`].
+///
+/// Its [`Display`](fmt::Display) is the error's message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct BuildsDiffer {
+    /// The IR module the item is in.
+    pub module: String,
+    /// The item, such as ``type `cVec4` `` or ``function `Entity::Update` ``.
+    pub item: String,
+    /// The label of the build whose IR has it first.
+    pub first: String,
+    /// The label of the build that disagrees.
+    pub second: String,
+    /// How they differ, such as `size 0x10 vs 0x20`.
+    pub difference: String,
+}
+
+impl fmt::Display for BuildsDiffer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let BuildsDiffer {
+            module,
+            item,
+            first,
+            second,
+            difference,
+        } = self;
+        write!(
+            f,
+            "`{module}`: {item} differs between builds `{first}` and `{second}`: {difference}"
+        )
+    }
 }
 
 impl fmt::Display for Error {
@@ -53,6 +110,21 @@ impl fmt::Display for Error {
             Error::InvalidModuleName { name } => {
                 write!(f, "`{name}` is not a valid Rust module name")
             }
+            Error::DuplicateBuild { label } => {
+                write!(
+                    f,
+                    "build `{label}` is given twice, or as another label's `Build` variant"
+                )
+            }
+            Error::InvalidBuildLabel { label } => write!(
+                f,
+                "`{label}` is not a valid build label; use lowercase letters, digits and single \
+                 underscores, starting with a letter, as in `steam_2021`"
+            ),
+            Error::UnknownBuild { label } => {
+                write!(f, "`accept_build` names build `{label}`, which no IR has")
+            }
+            Error::BuildsDiffer(differ) => differ.fmt(f),
         }
     }
 }

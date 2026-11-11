@@ -19,7 +19,7 @@ fn main() -> ExitCode {
         .map(PathBuf::from)
         .unwrap_or_else(|| std::env::temp_dir().join("imped.rs"));
 
-    match Builder::new(&ir).generate_to(&output) {
+    match Builder::new().ir("steam", &ir).generate_to(&output) {
         Ok(warnings) => {
             for warning in &warnings {
                 eprintln!("warning: {warning}");

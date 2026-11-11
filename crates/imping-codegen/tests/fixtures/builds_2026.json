@@ -1,0 +1,43 @@
+{
+  "format_version": { "major": 1, "minor": 0 },
+  "modules": [
+    {
+      "name": "game.exe",
+      "architecture": "x64",
+      "image_base": "0x140000000",
+      "timestamp": "0x6ac89519",
+      "image_size": "0x18be000",
+      "types": [
+        { "id": 0, "name": "float", "kind": "primitive", "primitive": "f32" },
+        { "id": 1, "name": "Player", "kind": "struct", "size": 8, "align": 4,
+          "fields": [
+            { "name": "health", "type": 3, "offset": 0 },
+            { "name": "speed", "type": 0, "offset": 4 }
+          ] },
+        { "id": 2, "name": "Player *", "kind": "pointer", "pointee": 1 },
+        { "id": 3, "name": "int", "kind": "primitive", "primitive": "i32" },
+        { "id": 4, "name": "void", "kind": "primitive", "primitive": "void" },
+        { "id": 5, "name": "Enemy", "kind": "struct", "size": 4, "align": 4,
+          "fields": [{ "name": "hp", "type": 3, "offset": 0 }] }
+      ],
+      "functions": [
+        { "name": "GetPlayer", "rva": "0x1010", "calling_convention": "win64",
+          "return_type": 2, "parameters": [],
+          "verification": "4883ec28", "shape": "48 83 ec 28",
+          "pattern": { "bytes": "48 83 ec 28 48 8b 05" } },
+        { "name": "Damage", "namespace": ["Player"], "rva": "0x1210",
+          "calling_convention": "win64", "return_type": 4,
+          "parameters": [
+            { "name": "this", "type": 2, "storage": { "kind": "register", "value": "rcx" } },
+            { "name": "amount", "type": 0, "storage": { "kind": "register", "value": "xmm1" } }
+          ] },
+        { "name": "NewOnly", "namespace": ["util"], "rva": "0x1300",
+          "calling_convention": "win64", "return_type": 3, "parameters": [] }
+      ],
+      "globals": [
+        { "name": "gPlayer", "rva": "0x200020", "type": 2 },
+        { "name": "gNewOnly", "rva": "0x200030", "type": 3 }
+      ]
+    }
+  ]
+}

@@ -1,9 +1,14 @@
-//! Compiles the bindings generated from imping-codegen's x64 fixture IR under
+//! Compiles the bindings generated from imping-codegen's x64 fixture IRs under
 //! this workspace's lints, and tests them at run time.
 //!
 //! Just compiling it checks the generated layout assertions.
 
 include!(concat!(env!("OUT_DIR"), "/imped.rs"));
+
+/// Bindings generated from two builds of one module.
+pub mod builds {
+    include!(concat!(env!("OUT_DIR"), "/builds.rs"));
+}
 
 /// Text types mapped to the runtime's string types.
 #[cfg(test)]
@@ -154,23 +159,25 @@ mod functions {
 
     #[test]
     fn addresses_names_and_signatures() {
-        assert_eq!(game::GetPlayer::RVA, 0x15200);
-        assert_eq!(game::entity::Update::RVA, 0x15040);
-        assert_eq!(game::entity::Update::VERIFICATION, [0x48, 0x83, 0xec, 0x28]);
+        assert_eq!(game::GetPlayer::RVA_STEAM, 0x15200);
+        assert_eq!(game::entity::Update::RVA_STEAM, 0x15040);
         assert_eq!(
-            game::entity::Damage::RVA,
+            game::entity::Update::VERIFICATION_STEAM,
+            [0x48, 0x83, 0xec, 0x28]
+        );
+        assert_eq!(
+            game::entity::Damage::RVA_STEAM,
             0x15300,
             "the overload with the lowest RVA keeps the plain name"
         );
-        assert_eq!(game::entity::Damage_2::RVA, 0x15400);
-        assert_eq!(game::entity::Entity::RVA, 0x15000, "a constructor");
-        assert_eq!(game::init_2::RVA, 0x15d00, "`init` is reserved");
-        assert_eq!(game::util::FastPath::RVA, 0x15b00);
-        assert_eq!(game::util::Log::RVA, 0x15a00);
-        assert_eq!(game::game::world::Tick::RVA, 0x16000);
-        assert_eq!(game::gGravity.rva(), 0x3a1200);
-        assert_eq!(game::gPlayer.rva(), 0x3a1400);
-        assert_eq!(game::entity::sCount.rva(), 0x3a1300);
+        assert_eq!(game::entity::Damage_2::RVA_STEAM, 0x15400);
+        assert_eq!(game::entity::Entity::RVA_STEAM, 0x15000, "a constructor");
+        assert_eq!(game::init_2::RVA_STEAM, 0x15d00, "`init` is reserved");
+        assert_eq!(game::util::FastPath::RVA_STEAM, 0x15b00);
+        assert_eq!(game::util::Log::RVA_STEAM, 0x15a00);
+        assert_eq!(game::game::world::Tick::RVA_STEAM, 0x16000);
+        assert_eq!(game::gGravity.rva(), None, "no build before init");
+        assert_eq!(game::entity::sCount.rva(), None);
         assert_eq!(game::entity::sCount.module().name(), "game.exe");
 
         let _: game::entity::Update::Signature = update_like;
@@ -399,11 +406,59 @@ mod classes {
 
     #[test]
     fn namespaced_items_and_renamed_parameters() {
-        assert_eq!(super::game::actors::Spawn::RVA, 0x16200);
-        assert_eq!(super::game::actors::sLocalPlayer.rva(), 0x3a1500);
-        // `Rank` and `RVA` are renamed `Rank_` and `RVA_`, which only the
-        // generated code sees; the signatures keep their types.
+        assert_eq!(super::game::actors::Spawn::RVA_STEAM, 0x16200);
+        assert_eq!(super::game::actors::sLocalPlayer.try_ptr(), None);
+        // `Rank` and `RVA_STEAM` are renamed `Rank_` and `RVA_STEAM_`, which
+        // only the generated code sees; the signatures keep their types.
         let _: unsafe fn(*mut Actor, Rank, u32) -> *mut Player = super::game::actors::Spawn;
         let _: unsafe fn(*mut Entity, EntityKind, f32, i32) = super::game::Teleport;
+    }
+}
+
+/// Tests bindings generated from two builds.
+#[cfg(test)]
+mod two_builds {
+    use super::builds::game;
+    use imping_runtime::Error;
+
+    #[test]
+    fn each_build_keeps_its_addresses() {
+        assert_eq!(game::GetPlayer::RVA_STEAM_2021, 0x1000);
+        assert_eq!(game::GetPlayer::RVA_STEAM_2026, 0x1010);
+        assert_eq!(
+            game::GetPlayer::VERIFICATION_STEAM_2026,
+            [0x48, 0x83, 0xec, 0x28]
+        );
+        assert_eq!(game::player::Damage::RVA_STEAM_2021, 0x1200);
+        assert_eq!(game::player::Damage::RVA_STEAM_2026, 0x1210);
+    }
+
+    #[test]
+    fn items_only_one_build_has_are_generated() {
+        assert_eq!(game::util::OldOnly::RVA_STEAM_2021, 0x1100);
+        assert_eq!(game::util::NewOnly::RVA_STEAM_2026, 0x1300);
+        let _: unsafe fn() -> i32 = game::util::OldOnly;
+        let _: unsafe fn() -> i32 = game::util::NewOnly;
+        let _ = (&game::gOldOnly, &game::gNewOnly, game::Enemy::default());
+    }
+
+    #[test]
+    fn nothing_is_known_before_init() {
+        assert_eq!(game::build(), None);
+        assert_eq!(game::GetPlayer::rva(), None);
+        assert_eq!(game::gPlayer.rva(), None);
+        assert_eq!(game::gOldOnly.try_ptr(), None);
+    }
+
+    #[test]
+    fn init_reports_the_build_or_why_not() {
+        // SAFETY: `game.exe` is not loaded, so nothing is done through the
+        // bindings.
+        let result: Result<game::Build, Error> = unsafe { game::init() };
+        assert!(
+            matches!(result, Err(Error::ModuleNotLoaded { .. })),
+            "{result:?}"
+        );
+        assert_ne!(game::Build::Steam2021, game::Build::Steam2026);
     }
 }

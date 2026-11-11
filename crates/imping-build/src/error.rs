@@ -23,9 +23,9 @@ pub enum Error {
         /// Why it could not be parsed.
         source: imping_ir::Error,
     },
-    /// Bindings could not be generated from the IR.
+    /// Bindings could not be generated from the IR files.
     Generate {
-        /// The IR file.
+        /// The first IR file; `source` names the build involved.
         path: PathBuf,
         /// Why generation failed.
         source: imping_codegen::Error,

@@ -25,7 +25,10 @@ fn scratch(name: &str) -> PathBuf {
 #[test]
 fn generate_to_writes_bindings_with_a_source_line_and_returns_warnings() {
     let out = scratch("generate_to").join("bindings.rs");
-    let warnings = Builder::new(fixture()).generate_to(&out).expect("generate");
+    let warnings = Builder::new()
+        .ir("steam", fixture())
+        .generate_to(&out)
+        .expect("generate");
 
     let text = std::fs::read_to_string(&out).expect("read output");
     let mut lines = text.lines();
@@ -37,7 +40,7 @@ fn generate_to_writes_bindings_with_a_source_line_and_returns_warnings() {
     );
     assert_eq!(
         lines.next().unwrap(),
-        format!("// Source: {}", fixture().display())
+        format!("// Source: {} (steam)", fixture().display())
     );
     assert!(text.contains("pub mod game {"));
     assert!(text.contains("pub mod math {"));
@@ -52,7 +55,8 @@ fn generate_to_writes_bindings_with_a_source_line_and_returns_warnings() {
 #[test]
 fn module_names_reach_the_generator() {
     let out = scratch("module_name").join("bindings.rs");
-    Builder::new(fixture())
+    Builder::new()
+        .ir("steam", fixture())
         .module_name("game.exe", "old_game")
         .generate_to(&out)
         .expect("generate");
@@ -64,13 +68,70 @@ fn module_names_reach_the_generator() {
 #[test]
 fn accepted_builds_reach_the_generator() {
     let out = scratch("accept_build").join("bindings.rs");
-    Builder::new(fixture())
-        .accept_build("game.exe", 0x64b8f2a1, 0xa3c000)
+    Builder::new()
+        .ir("steam", fixture())
+        .accept_build("steam", "game.exe", 0x64b8f2a1, 0xa3c000)
         .generate_to(&out)
         .expect("generate");
     let text = std::fs::read_to_string(&out).expect("read output");
     assert!(text.contains("image_size: 0xa2b000"), "the IR's build");
     assert!(text.contains("image_size: 0xa3c000"), "the extra build");
+}
+
+/// Writes a copy of the fixture as another build, with another timestamp, and
+/// returns its path.
+fn second_build(dir: &Path) -> PathBuf {
+    let text = std::fs::read_to_string(fixture()).expect("read fixture");
+    let path = dir.join("small-2026.json");
+    let text = text.replace("\"0x64b8f2a1\"", "\"0x6ac89519\"");
+    std::fs::write(&path, text).expect("write second build");
+    path
+}
+
+#[test]
+fn several_builds_generate_one_set_of_bindings() {
+    let dir = scratch("several_builds");
+    let second = second_build(&dir);
+    let out = dir.join("bindings.rs");
+    Builder::new()
+        .ir("steam_2021", fixture())
+        .ir("steam_2026", &second)
+        .generate_to(&out)
+        .expect("generate");
+    let text = std::fs::read_to_string(&out).expect("read output");
+    let mut lines = text.lines().skip(1);
+    assert_eq!(
+        lines.next().unwrap(),
+        format!("// Source: {} (steam_2021)", fixture().display())
+    );
+    assert_eq!(
+        lines.next().unwrap(),
+        format!("// Source: {} (steam_2026)", second.display())
+    );
+    assert!(text.contains("Steam2021,"));
+    assert!(text.contains("Steam2026,"));
+    assert!(text.contains("timestamp: 0x6ac89519"));
+}
+
+#[test]
+fn generation_errors_name_the_first_file() {
+    let dir = scratch("generation_errors");
+    let second = second_build(&dir);
+    let error = Builder::new()
+        .ir("steam", fixture())
+        .ir("steam", &second)
+        .generate_to(dir.join("bindings.rs"))
+        .unwrap_err();
+    assert!(
+        matches!(
+            &error,
+            Error::Generate {
+                path,
+                source: imping_codegen::Error::DuplicateBuild { .. },
+            } if path == &fixture()
+        ),
+        "{error:?}"
+    );
 }
 
 #[test]
@@ -79,7 +140,10 @@ fn errors_name_the_file_involved() {
     let out = dir.join("bindings.rs");
 
     let missing = dir.join("missing.json");
-    let error = Builder::new(&missing).generate_to(&out).unwrap_err();
+    let error = Builder::new()
+        .ir("steam", &missing)
+        .generate_to(&out)
+        .unwrap_err();
     assert!(matches!(&error, Error::Read { path, .. } if path == &missing));
     assert!(
         error
@@ -90,7 +154,10 @@ fn errors_name_the_file_involved() {
 
     let invalid = dir.join("invalid.json");
     std::fs::write(&invalid, "{ \"format_version\": ").expect("write invalid IR");
-    let error = Builder::new(&invalid).generate_to(&out).unwrap_err();
+    let error = Builder::new()
+        .ir("steam", &invalid)
+        .generate_to(&out)
+        .unwrap_err();
     assert!(matches!(&error, Error::Parse { path, .. } if path == &invalid));
     let message = error.to_string();
     assert!(
@@ -102,7 +169,8 @@ fn errors_name_the_file_involved() {
         "the JSON position is included: {message}"
     );
 
-    let error = Builder::new(fixture())
+    let error = Builder::new()
+        .ir("steam", fixture())
         .module_name("other.dll", "other")
         .generate_to(&out)
         .unwrap_err();
@@ -122,7 +190,8 @@ fn errors_name_the_file_involved() {
     );
 
     let unwritable = dir.join("no-such-dir").join("bindings.rs");
-    let error = Builder::new(fixture())
+    let error = Builder::new()
+        .ir("steam", fixture())
         .generate_to(&unwritable)
         .unwrap_err();
     assert!(matches!(&error, Error::Write { path, .. } if path == &unwritable));
@@ -144,7 +213,7 @@ fn child_generate() {
     let Some(scenario) = std::env::var_os(CHILD) else {
         return;
     };
-    let mut builder = Builder::new(fixture());
+    let mut builder = Builder::new().ir("steam", fixture());
     if scenario == "out_file" {
         builder = builder.out_file("game.rs");
     }

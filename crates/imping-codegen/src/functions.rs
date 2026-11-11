@@ -1,16 +1,17 @@
 //! Emits functions and globals, one module per namespace.
 //!
 //! Each function becomes an `unsafe fn` plus a module of the same name holding
-//! its `RVA`, `VERIFICATION`, `Signature`, `resolve()`, `ptr()` and `hook()`,
-//! and the private `FUNCTION` they find it through. Types are
-//! named through explicit `super::` paths, not glob imports, so an item in a
-//! namespace module (such as a constructor `Entity::Entity`) can't shadow the
-//! type it refers to.
+//! its `RVA_<BUILD>` and `VERIFICATION_<BUILD>` per build, `rva()`,
+//! `Signature`, `resolve()`, `ptr()` and `hook()`, and the private `FUNCTION`
+//! they find it through. Types are named through explicit `super::` paths, not
+//! glob imports, so an item in a namespace module (such as a constructor
+//! `Entity::Entity`) can't shadow the type it refers to.
 
 use crate::Warning;
 use crate::emit::{doc, docs, hex, qualified};
 use crate::layout::Layouts;
-use crate::names::{self, Scope, doc_name, ident};
+use crate::merge::{FunctionSites, Merged};
+use crate::names::{self, Scope, build_const, doc_name, ident};
 use crate::namespaces::Namespace;
 use crate::types::{self, Text, TypeTable};
 use imping_ir::{Function, Global, Module, Rtti, TypeId, TypeKind};
@@ -23,9 +24,9 @@ use std::collections::{HashMap, HashSet};
 const MAX_HOOK_PARAMETERS: usize = 14;
 
 /// The items of a function's own module that its parameters could clash with
-/// in Rust patterns: its constants, its `FUNCTION` and `SLOT` statics and the
-/// tuple struct `Original`.
-const FUNCTION_MODULE_VALUES: &[&str] = &["RVA", "VERIFICATION", "FUNCTION", "SLOT", "Original"];
+/// in Rust patterns, besides its per-build constants: its `FUNCTION` and
+/// `SLOT` statics and the tuple struct `Original`.
+const FUNCTION_MODULE_VALUES: &[&str] = &["FUNCTION", "SLOT", "Original"];
 
 /// The function tag that marks a function as safe to call with valid
 /// arguments.
@@ -44,6 +45,7 @@ pub(crate) fn emit(
     table: &TypeTable<'_>,
     layouts: &Layouts,
     mut root: Namespace,
+    merged: &Merged<'_>,
     warnings: &mut Vec<Warning>,
 ) -> TokenStream {
     let module = table.module();
@@ -81,21 +83,51 @@ pub(crate) fn emit(
         values.entry(namespace).or_default().insert(name);
     }
     let no_values = HashSet::new();
-    let slots = vtable_slots(module);
 
-    for (function, name) in module.functions.iter().zip(&function_names) {
+    for ((function, name), sites) in module
+        .functions
+        .iter()
+        .zip(&function_names)
+        .zip(&merged.functions)
+    {
         let taken = values
             .get(function.namespace.as_slice())
             .unwrap_or(&no_values);
-        let slot = slot(&slots, function);
-        let item = emit_function(table, layouts, function, name, taken, slot, warnings);
+        let item = emit_function(table, layouts, function, name, taken, sites, warnings);
         root.at(&function.namespace).items.push(item);
     }
-    for (global, name) in module.globals.iter().zip(&global_names) {
-        let item = emit_global(table, global, name);
+    for ((global, name), rvas) in module
+        .globals
+        .iter()
+        .zip(&global_names)
+        .zip(&merged.globals)
+    {
+        let item = emit_global(table, global, name, rvas);
         root.at(&global.namespace).items.push(item);
     }
     root.into_tokens()
+}
+
+/// Lists an item's addresses for its docs: `` `game.exe+0x15040` `` with one
+/// build, otherwise each build's, and the builds whose IR lacks it.
+fn addresses(file: &str, rvas: &[(&str, Option<u32>)]) -> String {
+    if let [(_, Some(rva))] = rvas {
+        return format!("`{file}+{rva:#x}`");
+    }
+    let found: Vec<String> = rvas
+        .iter()
+        .filter_map(|(label, rva)| rva.map(|rva| format!("`{file}+{rva:#x}` in `{label}`")))
+        .collect();
+    let missing: Vec<String> = rvas
+        .iter()
+        .filter(|(_, rva)| rva.is_none())
+        .map(|(label, _)| format!("`{label}`"))
+        .collect();
+    let mut text = found.join(", ");
+    if !missing.is_empty() {
+        text.push_str(&format!(" (not in the IR of {})", missing.join(", ")));
+    }
+    text
 }
 
 /// Returns `super::` repeated `depth` times, the path from a module `depth`
@@ -257,7 +289,11 @@ fn parameters(
             return Err(format!("parameter `{source_name}` has no known size"));
         }
         let mut name = names::sanitize(&source_name);
-        if taken.contains(name.as_str()) || FUNCTION_MODULE_VALUES.contains(&name.as_str()) {
+        let per_build = name.starts_with("RVA_") || name.starts_with("VERIFICATION_");
+        if taken.contains(name.as_str())
+            || FUNCTION_MODULE_VALUES.contains(&name.as_str())
+            || per_build
+        {
             name.push('_');
         }
         parameters.push(Parameter {
@@ -273,10 +309,10 @@ fn parameters(
 
 /// A vtable slot a function is in: its vtable's namespace and RVA, the class's
 /// RTTI, and the slot's index.
-type Slot<'a> = (&'a [String], u32, &'a Rtti, u32);
+pub(crate) type Slot<'a> = (&'a [String], u32, &'a Rtti, u32);
 
 /// Returns the RTTI vtable slots each function address is in.
-fn vtable_slots(module: &Module) -> HashMap<u32, Vec<Slot<'_>>> {
+pub(crate) fn vtable_slots(module: &Module) -> HashMap<u32, Vec<Slot<'_>>> {
     let mut slots: HashMap<u32, Vec<Slot<'_>>> = HashMap::new();
     for vtable in &module.vtables {
         let Some(rtti) = &vtable.rtti else {
@@ -297,7 +333,10 @@ fn vtable_slots(module: &Module) -> HashMap<u32, Vec<Slot<'_>>> {
 /// Picks the slot a function is found through when its RVA and pattern fail:
 /// in its own class's vtable if it's there, otherwise the first vtable holding
 /// it. Only for functions with a shape, which checks the slot still holds it.
-fn slot<'a>(slots: &HashMap<u32, Vec<Slot<'a>>>, function: &Function) -> Option<Slot<'a>> {
+pub(crate) fn slot<'a>(
+    slots: &HashMap<u32, Vec<Slot<'a>>>,
+    function: &Function,
+) -> Option<Slot<'a>> {
     if function.shape.is_empty() {
         return None;
     }
@@ -317,7 +356,7 @@ fn emit_function(
     function: &Function,
     name: &str,
     taken: &HashSet<&str>,
-    slot: Option<Slot<'_>>,
+    sites: &FunctionSites<'_>,
     warnings: &mut Vec<Warning>,
 ) -> TokenStream {
     let module = table.module();
@@ -326,7 +365,12 @@ fn emit_function(
     let shown = doc_name(&qualified_name);
     let file = doc_name(&module.name);
     let fn_ident = ident(name);
-    let mut summary = format!("`{shown}` at `{file}+{:#x}`.", function.rva);
+    let rvas: Vec<(&str, Option<u32>)> = sites
+        .sites
+        .iter()
+        .map(|&(label, site)| (label, site.map(|function| function.rva)))
+        .collect();
+    let mut summary = format!("`{shown}` at {}.", addresses(&file, &rvas));
     if !function.tags.is_empty() {
         let tags: Vec<String> = function
             .tags
@@ -335,14 +379,19 @@ fn emit_function(
             .collect();
         summary.push_str(&format!(" Tags: {}.", tags.join(", ")));
     }
-    let rva_doc = doc(format!(
-        "The function's address relative to `{file}`'s base."
-    ));
-    let rva = hex(u64::from(function.rva));
-    let rva_item = quote! {
-        #rva_doc
-        pub const RVA: u32 = #rva;
-    };
+    let rva_items = sites.sites.iter().filter_map(|&(label, site)| {
+        let site = site?;
+        let doc = doc(format!(
+            "The function's address relative to `{file}`'s base in the `{label}` build."
+        ));
+        let name = ident(&format!("RVA_{}", build_const(label)));
+        let rva = hex(u64::from(site.rva));
+        Some(quote! {
+            #doc
+            pub const #name: u32 = #rva;
+        })
+    });
+    let rva_items = quote! { #(#rva_items)* };
 
     if function.custom_storage {
         warnings.push(Warning::CustomStorage {
@@ -351,12 +400,12 @@ fn emit_function(
         });
         let doc = docs(&[
             summary,
-            "It uses custom argument storage, so only its address is generated.".to_owned(),
+            "It uses custom argument storage, so only its addresses are generated.".to_owned(),
         ]);
         return quote! {
             #doc
             pub mod #fn_ident {
-                #rva_item
+                #rva_items
             }
         };
     }
@@ -398,25 +447,41 @@ fn emit_function(
         #[doc = " The function's type."]
         pub type Signature = unsafe extern #abi fn(#(#signature_params),* #dots) #output_inner;
     };
-    let verified = !function.verification.is_empty();
-    let verification_item = verified.then(|| {
-        let bytes = function
-            .verification
-            .iter()
-            .map(|byte| hex(u64::from(*byte)));
-        quote! {
-            #[doc = " The bytes expected at the function's start; `resolve` and `hook` check them."]
-            pub const VERIFICATION: &[u8] = &[#(#bytes),*];
-        }
+    let verified = sites.present().any(|site| !site.verification.is_empty());
+    let verification_items = sites.sites.iter().filter_map(|&(label, site)| {
+        let site = site.filter(|site| !site.verification.is_empty())?;
+        let doc = doc(format!(
+            "The bytes the function starts with in the `{label}` build; `resolve` and `hook` \
+             check them."
+        ));
+        let name = ident(&format!("VERIFICATION_{}", build_const(label)));
+        let bytes = site.verification.iter().map(|byte| hex(u64::from(*byte)));
+        Some(quote! {
+            #doc
+            pub const #name: &[u8] = &[#(#bytes),*];
+        })
     });
-    let function_item = function_item(function, &qualified_name, verified, slot, &to_root);
-    let fallback = match (function.pattern.is_some(), slot.is_some()) {
+    let verification_items = quote! { #(#verification_items)* };
+    let function_item = function_item(&qualified_name, sites, &to_root);
+    let has_pattern = sites.present().any(|site| site.pattern.is_some());
+    let fallback = match (has_pattern, sites.slot.is_some()) {
         (true, true) => Some("by its byte pattern or its class's vtable"),
         (true, false) => Some("by its byte pattern"),
         (false, true) => Some("through its class's vtable"),
         (false, false) => None,
     };
-    let resolve_item = resolve_item(&file, verified, fallback);
+    let missing = sites.sites.iter().any(|(_, site)| site.is_none());
+    let resolve_item = resolve_item(&file, verified, fallback, missing);
+    let rva_fn_doc = docs(&[format!(
+        "The function's address relative to `{file}`'s base in the loaded build: `None` before \
+         `init()`, on a build none of the IRs is, or if the loaded build's IR lacks it."
+    )]);
+    let rva_fn = quote! {
+        #rva_fn_doc
+        pub fn rva() -> ::core::option::Option<u32> {
+            FUNCTION.rva()
+        }
+    };
     let ptr_doc = docs(&[
         "The function's address in this process.".to_owned(),
         "# Panics".to_owned(),
@@ -440,8 +505,9 @@ fn emit_function(
         return quote! {
             #doc
             pub mod #fn_ident {
-                #rva_item
-                #verification_item
+                #rva_items
+                #verification_items
+                #rva_fn
                 #signature_item
                 #function_item
                 #resolve_item
@@ -549,8 +615,9 @@ fn emit_function(
 
         #module_doc
         pub mod #fn_ident {
-            #rva_item
-            #verification_item
+            #rva_items
+            #verification_items
+            #rva_fn
             #signature_item
             #function_item
             #resolve_item
@@ -561,36 +628,50 @@ fn emit_function(
 }
 
 /// Returns the private `FUNCTION` static that `resolve()` and `hook()` find the
-/// function through.
+/// function through, with a site per build.
 fn function_item(
-    function: &Function,
     qualified_name: &str,
-    verified: bool,
-    slot: Option<Slot<'_>>,
+    sites: &FunctionSites<'_>,
     to_root: &TokenStream,
 ) -> TokenStream {
-    let verification = if verified {
-        quote! { VERIFICATION }
-    } else {
-        quote! { &[] }
-    };
-    let pattern = match &function.pattern {
-        Some(pattern) => {
-            let bytes = &pattern.bytes;
-            let offset = proc_macro2::Literal::i32_unsuffixed(pattern.offset);
-            let follow_call = pattern.follow_call;
-            quote! {
-                ::core::option::Option::Some(::imping_runtime::__private::Pattern {
-                    bytes: #bytes,
-                    offset: #offset,
-                    follow_call: #follow_call,
-                })
+    let sites_tokens = sites.sites.iter().map(|&(label, site)| {
+        let Some(function) = site else {
+            return quote! { ::core::option::Option::None };
+        };
+        let suffix = build_const(label);
+        let rva = ident(&format!("RVA_{suffix}"));
+        let verification = if function.verification.is_empty() {
+            quote! { &[] }
+        } else {
+            let name = ident(&format!("VERIFICATION_{suffix}"));
+            quote! { #name }
+        };
+        let pattern = match &function.pattern {
+            Some(pattern) => {
+                let bytes = &pattern.bytes;
+                let offset = proc_macro2::Literal::i32_unsuffixed(pattern.offset);
+                let follow_call = pattern.follow_call;
+                quote! {
+                    ::core::option::Option::Some(::imping_runtime::__private::Pattern {
+                        bytes: #bytes,
+                        offset: #offset,
+                        follow_call: #follow_call,
+                    })
+                }
             }
+            None => quote! { ::core::option::Option::None },
+        };
+        let shape = &function.shape;
+        quote! {
+            ::core::option::Option::Some(::imping_runtime::__private::Site {
+                rva: #rva,
+                verification: #verification,
+                shape: #shape,
+                pattern: #pattern,
+            })
         }
-        None => quote! { ::core::option::Option::None },
-    };
-    let shape = &function.shape;
-    let slot = match slot {
+    });
+    let slot = match sites.slot {
         Some((_, _, rtti, index)) => {
             let type_name = &rtti.type_name;
             let offset = proc_macro2::Literal::u32_unsuffixed(rtti.offset);
@@ -610,41 +691,51 @@ fn function_item(
             ::imping_runtime::__private::Function::new(
                 &#to_root MODULE,
                 #qualified_name,
-                RVA,
-                #verification,
-                #shape,
-                #pattern,
+                &[#(#sites_tokens),*],
                 #slot,
             );
     }
 }
 
-/// Returns a function's `resolve()`.
-fn resolve_item(file: &str, verified: bool, fallback: Option<&str>) -> TokenStream {
-    let (how, errors) = if verified {
+/// Returns a function's `resolve()`. `missing` says some build's IR lacks the
+/// function.
+fn resolve_item(file: &str, verified: bool, fallback: Option<&str>, missing: bool) -> TokenStream {
+    let (mut how, mut errors) = if verified {
         let mut how = format!(
-            "On a build `{file}`'s `init()` accepts, that's `RVA`. On another, the first call \
-             checks the bytes there against `VERIFICATION`"
+            "On a build `{file}`'s `init()` accepts, that's the function's RVA in that build. On \
+             another, the first call checks the bytes at each build's RVA against that build's \
+             `VERIFICATION_` bytes"
         );
         let mut errors = format!(
             "Fails unless `{file}`'s `init()` has succeeded, or on a build it doesn't accept, \
-             if the first bytes differ from `VERIFICATION`"
+             if no build's bytes match"
         );
         if let Some(fallback) = fallback {
             how.push_str(&format!(
-                ", and if they differ, finds the function {fallback} instead"
+                ", and if none match, finds the function {fallback} instead"
             ));
             errors.push_str(&format!(" and it can't be found {fallback}"));
         }
         how.push('.');
-        errors.push('.');
         (how, errors)
     } else {
         (
-            "That's `RVA`, unchecked, as there are no bytes to verify it by.".to_owned(),
-            format!("Fails unless `{file}`'s `init()` has succeeded."),
+            "That's the function's RVA in the loaded build, unchecked, as there are no bytes to \
+             verify it by."
+                .to_owned(),
+            format!("Fails unless `{file}`'s `init()` has succeeded"),
         )
     };
+    if missing {
+        match fallback {
+            Some(fallback) => how.push_str(&format!(
+                " Where the loaded build's IR lacks it, the first call finds it {fallback}."
+            )),
+            None => how.push_str(" Where the loaded build's IR lacks it, nothing finds it."),
+        }
+        errors.push_str(", or where the loaded build's IR lacks it, if nothing finds it");
+    }
+    errors.push('.');
     let doc = docs(&[
         "Finds the function in this process.".to_owned(),
         how,
@@ -687,12 +778,15 @@ fn hook_items(
          the function"
     );
     if verified {
-        errors.push_str(", if its first bytes differ from `VERIFICATION`");
+        errors
+            .push_str(", if its first bytes differ from the loaded build's `VERIFICATION_` bytes");
         if let Some(fallback) = fallback {
             errors.push_str(&format!(" and it can't be found {fallback}"));
         }
     }
-    errors.push_str(", or if patching fails.");
+    errors.push_str(
+        ", if the loaded build's IR lacks it and nothing finds it, or if patching fails.",
+    );
     let hook_doc = docs(&[
         format!(
             "Hooks `{shown}`: once enabled, every call runs `detour`, which receives an \
@@ -763,23 +857,33 @@ fn hook_items(
     }
 }
 
-/// Emits one global as a `static` `imping_runtime::Global`.
-fn emit_global(table: &TypeTable<'_>, global: &Global, name: &str) -> TokenStream {
+/// Emits one global as a `static` `imping_runtime::Global`, with its address
+/// in each build.
+fn emit_global(
+    table: &TypeTable<'_>,
+    global: &Global,
+    name: &str,
+    rvas: &[(&str, Option<u32>)],
+) -> TokenStream {
     let module = table.module();
     let depth = global.namespace.len();
-    let shown = doc_name(&qualified(&global.namespace, &global.name));
-    let doc = doc(format!(
-        "`{shown}` at `{}+{:#x}`.",
-        doc_name(&module.name),
-        global.rva
-    ));
+    let qualified_name = qualified(&global.namespace, &global.name);
+    let shown = doc_name(&qualified_name);
+    let file = doc_name(&module.name);
+    let doc = doc(format!("`{shown}` at {}.", addresses(&file, rvas)));
     let name = ident(name);
     let ty = table.rust_type(global.type_id, depth);
     let to_root = supers(depth);
-    let rva = hex(u64::from(global.rva));
+    let rvas = rvas.iter().map(|(_, rva)| match rva {
+        Some(rva) => {
+            let rva = hex(u64::from(*rva));
+            quote! { ::core::option::Option::Some(#rva) }
+        }
+        None => quote! { ::core::option::Option::None },
+    });
     quote! {
         #doc
         pub static #name: ::imping_runtime::Global<#ty> =
-            ::imping_runtime::Global::new(&#to_root MODULE, #rva);
+            ::imping_runtime::__private::global(&#to_root MODULE, #qualified_name, &[#(#rvas),*]);
     }
 }

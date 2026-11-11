@@ -6,27 +6,28 @@
 use crate::Warning;
 use crate::functions;
 use crate::layout::{BitKind, BitMember, Layouts, Member, Plan, Repr, StructPlan, UnionPlan};
-use crate::names::{self, Scope, doc_name, ident};
+use crate::merge::Merged;
+use crate::names::{self, Scope, build_variant, doc_name, ident};
 use crate::namespaces::Namespace;
 use crate::types::{Integer, TypeTable};
-use imping_ir::{Architecture, EnumVariant, Field, Module, TypeDef, TypeId, TypeKind};
+use imping_ir::{Architecture, EnumVariant, Field, TypeDef, TypeId, TypeKind};
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote;
 use std::collections::HashSet;
 
-/// Emits the `pub mod` for one IR module: its identity and `init`, then its
-/// types, functions and globals, each in its namespace's module.
-///
-/// `extra_builds` are the builds (timestamp, image size) accepted besides the
-/// IR's own.
+/// Emits the `pub mod` for one IR module, merged across its builds: its
+/// identity, `Build`, `build()` and `init`, then its types, functions and
+/// globals, each in its namespace's module.
 pub(crate) fn module(
-    module: &Module,
+    merged: &Merged<'_>,
     rust_name: &str,
-    extra_builds: &[(u32, u32)],
     warnings: &mut Vec<Warning>,
 ) -> TokenStream {
+    let module = &merged.module;
     let mut scope = Scope::default();
     scope.reserve("MODULE");
+    scope.reserve("Build");
+    scope.reserve("build");
     scope.reserve("init");
     scope.reserve("init_any_build");
     // Function and global namespaces go first, so type namespaces can't rename
@@ -48,19 +49,27 @@ pub(crate) fn module(
             root.at(&def.namespace).items.push(item);
         }
     }
-    let code = functions::emit(&table, &layouts, root, warnings);
+    let code = functions::emit(&table, &layouts, root, merged, warnings);
 
     let architecture = match module.architecture {
         Architecture::X86 => "x86",
         Architecture::X64 => "x64",
     };
+    let builds: Vec<String> = merged
+        .labels
+        .iter()
+        .zip(&merged.identities)
+        .map(|(label, (_, timestamp, image_size))| {
+            format!("`{label}` (timestamp `{timestamp:#x}`, image size `{image_size:#x}`)")
+        })
+        .collect();
     let doc = doc(format!(
-        "Bindings for `{}` ({architecture}, timestamp `{:#x}`, image size `{:#x}`).",
+        "Bindings for `{}` ({architecture}), build{} {}.",
         doc_name(&module.name),
-        module.timestamp,
-        module.image_size
+        if builds.len() == 1 { "" } else { "s" },
+        join_words(&builds)
     ));
-    let identity = identity(module, extra_builds, architecture);
+    let identity = identity(merged, architecture);
     let name = ident(rust_name);
     quote! {
         #doc
@@ -72,30 +81,55 @@ pub(crate) fn module(
     }
 }
 
-/// Returns `MODULE`, `init()` and the compile-time target architecture check.
-fn identity(module: &Module, extra_builds: &[(u32, u32)], architecture: &str) -> TokenStream {
+/// Returns `MODULE`, `Build`, `build()`, `init()` and the compile-time target
+/// architecture check.
+fn identity(merged: &Merged<'_>, architecture: &str) -> TokenStream {
+    let module = &merged.module;
     let file = doc_name(&module.name);
     let name = Literal::string(&module.name);
-    // The IR's own build first, then the extra ones, without repeats.
-    let mut builds = vec![(module.timestamp, module.image_size)];
-    for build in extra_builds {
-        if !builds.contains(build) {
-            builds.push(*build);
-        }
-    }
-    let builds = builds.iter().map(|&(timestamp, image_size)| {
+    let builds = merged.identities.iter().map(|&(_, timestamp, image_size)| {
         let timestamp = hex(u64::from(timestamp));
         let image_size = hex(u64::from(image_size));
         quote! { ::imping_runtime::Build { timestamp: #timestamp, image_size: #image_size } }
     });
+    let build_of = merged
+        .identities
+        .iter()
+        .map(|&(index, ..)| Literal::usize_unsuffixed(index));
+    let labels = merged.labels.iter().map(|label| Literal::string(label));
     let module_doc = doc(format!(
-        "The builds of `{file}` these bindings accept, the one they were generated from first."
+        "`{file}`: the builds these bindings accept, the ones they were generated from first."
     ));
+    let variants: Vec<Ident> = merged
+        .labels
+        .iter()
+        .map(|label| ident(&build_variant(label)))
+        .collect();
+    let variant_docs = merged.labels.iter().enumerate().map(|(index, label)| {
+        let identities: Vec<String> = merged
+            .identities
+            .iter()
+            .filter(|(build, ..)| *build == index)
+            .map(|(_, timestamp, image_size)| {
+                format!("timestamp `{timestamp:#x}`, image size `{image_size:#x}`")
+            })
+            .collect();
+        doc(format!("`{label}`: {}.", identities.join("; or ")))
+    });
+    let count = Literal::usize_unsuffixed(merged.labels.len());
+    let build_enum_doc = doc(format!(
+        "The builds of `{file}` these bindings were generated from, named after the labels of \
+         their IR files."
+    ));
+    let build_doc = docs(&[format!(
+        "The build of `{file}` that `init()` found: `None` before it has succeeded, or after \
+         `init_any_build()` found a build none of the IRs is."
+    )]);
     let init_doc = docs(&[
         format!(
-            "Finds `{file}` in this process and checks it is a build these bindings accept. \
-             Call it before calling or hooking anything in this module; once it has succeeded, \
-             calling it again does nothing."
+            "Finds `{file}` in this process, checks it is a build these bindings accept and \
+             returns which. Call it before calling or hooking anything in this module; once it \
+             has succeeded, calling it again does nothing."
         ),
         "# Errors".to_owned(),
         format!(
@@ -136,13 +170,30 @@ fn identity(module: &Module, extra_builds: &[(u32, u32)], architecture: &str) ->
     ));
     quote! {
         #module_doc
-        pub static MODULE: ::imping_runtime::Module =
-            ::imping_runtime::Module::new(#name, &[#(#builds),*]);
+        pub static MODULE: ::imping_runtime::Module = ::imping_runtime::__private::module(
+            #name,
+            &[#(#builds),*],
+            &[#(#build_of),*],
+            &[#(#labels),*],
+        );
+
+        #build_enum_doc
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+        pub enum Build {
+            #(#variant_docs #variants,)*
+        }
+
+        #build_doc
+        pub fn build() -> ::core::option::Option<Build> {
+            const BUILDS: [Build; #count] = [#(Build::#variants),*];
+            ::imping_runtime::__private::build_index(&MODULE).and_then(|index| BUILDS.get(index).copied())
+        }
 
         #init_doc
-        pub unsafe fn init() -> ::core::result::Result<(), ::imping_runtime::Error> {
+        pub unsafe fn init() -> ::core::result::Result<Build, ::imping_runtime::Error> {
             #[comment = " SAFETY: forwarded to the caller."]
-            unsafe { MODULE.init() }
+            unsafe { MODULE.init() }?;
+            ::core::result::Result::Ok(build().expect("an accepted build is one of the labelled ones"))
         }
 
         #any_build_doc

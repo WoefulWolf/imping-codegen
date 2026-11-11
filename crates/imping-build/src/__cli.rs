@@ -19,36 +19,46 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Generates Rust bindings from an IR file.
+    /// Generates Rust bindings from the IR files of one or more builds.
     Generate {
-        /// The IR file to read.
-        ir: PathBuf,
         /// Where to write the bindings; standard output if omitted.
         #[arg(short, long, value_name = "FILE")]
         output: Option<PathBuf>,
         #[command(flatten)]
-        names: ModuleNames,
+        options: Options,
     },
-    /// Checks that an IR file generates bindings, and prints any warnings.
+    /// Checks that the IR files generate bindings, and prints any warnings.
     Check {
-        /// The IR file to read.
-        ir: PathBuf,
         #[command(flatten)]
-        names: ModuleNames,
+        options: Options,
     },
 }
 
 #[derive(Debug, clap::Args)]
-struct ModuleNames {
+struct Options {
+    /// The IR file of a build, with the label that names the build in the
+    /// bindings, e.g. `steam_2021=ir/target-2021.json`. Repeat it for each
+    /// build.
+    #[arg(long = "ir", value_name = "LABEL=FILE", required = true, value_parser = parse_ir)]
+    irs: Vec<(String, PathBuf)>,
     /// Names the Rust module generated for an IR module, e.g.
     /// `TargetCore.dll=target`. May be repeated.
     #[arg(long = "module-name", value_name = "IR=RUST", value_parser = parse_module_name)]
     module_names: Vec<(String, String)>,
-    /// Makes an IR module's `init()` also accept another build of it, by the
-    /// timestamp and image size from its image header, e.g.
-    /// `target.exe=0x64b8f2a1:0xa3c000`. May be repeated.
-    #[arg(long = "accept-build", value_name = "IR=TIMESTAMP:IMAGE_SIZE", value_parser = parse_accept_build)]
-    accept_builds: Vec<(String, u32, u32)>,
+    /// Makes an IR module's `init()` also accept another image as the
+    /// labelled build, by the timestamp and image size from its image header,
+    /// e.g. `steam:target.exe=0x64b8f2a1:0xa3c000`. May be repeated.
+    #[arg(long = "accept-build", value_name = "LABEL:IR=TIMESTAMP:IMAGE_SIZE", value_parser = parse_accept_build)]
+    accept_builds: Vec<(String, String, u32, u32)>,
+}
+
+fn parse_ir(value: &str) -> Result<(String, PathBuf), String> {
+    match value.split_once('=') {
+        Some((label, path)) if !label.is_empty() && !path.is_empty() => {
+            Ok((label.to_owned(), PathBuf::from(path)))
+        }
+        _ => Err(format!("expected `<label>=<IR file>`, got `{value}`")),
+    }
 }
 
 fn parse_module_name(value: &str) -> Result<(String, String), String> {
@@ -62,17 +72,19 @@ fn parse_module_name(value: &str) -> Result<(String, String), String> {
     }
 }
 
-fn parse_accept_build(value: &str) -> Result<(String, u32, u32), String> {
-    let parsed = value.split_once('=').and_then(|(ir, build)| {
-        let (timestamp, image_size) = build.split_once(':')?;
-        Some((ir, parse_u32(timestamp)?, parse_u32(image_size)?))
+fn parse_accept_build(value: &str) -> Result<(String, String, u32, u32), String> {
+    let parsed = value.split_once('=').and_then(|(build, image)| {
+        let (label, ir) = build.split_once(':')?;
+        let (timestamp, image_size) = image.split_once(':')?;
+        Some((label, ir, parse_u32(timestamp)?, parse_u32(image_size)?))
     });
     match parsed {
-        Some((ir, timestamp, image_size)) if !ir.is_empty() => {
-            Ok((ir.to_owned(), timestamp, image_size))
+        Some((label, ir, timestamp, image_size)) if !label.is_empty() && !ir.is_empty() => {
+            Ok((label.to_owned(), ir.to_owned(), timestamp, image_size))
         }
         _ => Err(format!(
-            "expected `<IR module>=<timestamp>:<image size>` (decimal or 0x hex), got `{value}`"
+            "expected `<label>:<IR module>=<timestamp>:<image size>` (decimal or 0x hex), got \
+             `{value}`"
         )),
     }
 }
@@ -113,19 +125,25 @@ pub fn main() -> ExitCode {
     }
 }
 
-fn builder(ir: PathBuf, names: ModuleNames) -> Builder {
-    let builder = names
+fn builder(options: Options) -> Builder {
+    let builder = options
+        .irs
+        .into_iter()
+        .fold(Builder::new(), |builder, (label, path)| {
+            builder.ir(label, path)
+        });
+    let builder = options
         .module_names
         .into_iter()
-        .fold(Builder::new(ir), |builder, (ir_name, rust_name)| {
+        .fold(builder, |builder, (ir_name, rust_name)| {
             builder.module_name(ir_name, rust_name)
         });
-    names
-        .accept_builds
-        .into_iter()
-        .fold(builder, |builder, (ir_name, timestamp, image_size)| {
-            builder.accept_build(ir_name, timestamp, image_size)
-        })
+    options.accept_builds.into_iter().fold(
+        builder,
+        |builder, (label, ir_name, timestamp, image_size)| {
+            builder.accept_build(label, ir_name, timestamp, image_size)
+        },
+    )
 }
 
 fn print_warnings(warnings: &[Warning]) {
@@ -136,8 +154,8 @@ fn print_warnings(warnings: &[Warning]) {
 
 fn run(command: Command) -> Result<(), Error> {
     match command {
-        Command::Generate { ir, output, names } => {
-            let builder = builder(ir, names);
+        Command::Generate { output, options } => {
+            let builder = builder(options);
             let warnings = match output {
                 Some(path) => builder.generate_to(path)?,
                 None => {
@@ -154,13 +172,23 @@ fn run(command: Command) -> Result<(), Error> {
             };
             print_warnings(&warnings);
         }
-        Command::Check { ir, names } => {
-            let display = ir.display().to_string();
-            let (_, warnings) = builder(ir, names).render()?;
+        Command::Check { options } => {
+            let files: Vec<String> = options
+                .irs
+                .iter()
+                .map(|(_, path)| format!("`{}`", path.display()))
+                .collect();
+            let (_, warnings) = builder(options).render()?;
             print_warnings(&warnings);
             let plural = if warnings.len() == 1 { "" } else { "s" };
+            let verb = if files.len() == 1 {
+                "generates"
+            } else {
+                "generate"
+            };
             println!(
-                "`{display}` generates bindings ({} warning{plural})",
+                "{} {verb} bindings ({} warning{plural})",
+                files.join(" and "),
                 warnings.len()
             );
         }

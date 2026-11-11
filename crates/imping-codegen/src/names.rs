@@ -98,6 +98,38 @@ pub(crate) fn is_plain_identifier(text: &str) -> bool {
         && !UNRAWABLE_KEYWORDS.contains(&text)
 }
 
+/// Returns whether `label` can label a build: lowercase ASCII letters, digits
+/// and single underscores between them, starting with a letter, as in
+/// `steam_2021`.
+pub(crate) fn is_build_label(label: &str) -> bool {
+    label.starts_with(|c: char| c.is_ascii_lowercase())
+        && label
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+        && !label.ends_with('_')
+        && !label.contains("__")
+}
+
+/// The `Build` variant for a label from [`is_build_label`]: `steam_2021`
+/// becomes `Steam2021`.
+pub(crate) fn build_variant(label: &str) -> String {
+    label
+        .split('_')
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                Some(first) => first.to_ascii_uppercase().to_string() + chars.as_str(),
+                None => String::new(),
+            }
+        })
+        .collect()
+}
+
+/// The suffix of a build's constants: `steam_2021` becomes `STEAM_2021`.
+pub(crate) fn build_const(label: &str) -> String {
+    label.to_ascii_uppercase()
+}
+
 /// Turns a bare identifier from [`sanitize`] into a token, raw if it is a
 /// keyword.
 pub(crate) fn ident(text: &str) -> Ident {

@@ -13,9 +13,13 @@ imping-build = { git = "https://github.com/WoefulWolf/imping-codegen" }
 ```rust
 // build.rs
 fn main() -> Result<(), imping_build::Error> {
-    imping_build::Builder::new("target.ir.json").generate()
+    imping_build::Builder::new()
+        .ir("steam", "target.ir.json")
+        .generate()
 }
 ```
+
+The label names the build. For several builds of the program, add an `.ir(label, file)` for each: the bindings then work on all of them, and `init()` returns the one that's loaded.
 
 ```rust
 // src/lib.rs
@@ -37,7 +41,7 @@ Or from the command line:
 
 ```sh
 cargo install imping-build --git https://github.com/WoefulWolf/imping-codegen --features cli
-imping generate target.ir.json -o src/imped.rs
+imping generate --ir steam=target.ir.json -o src/imped.rs
 ```
 
 [API docs](https://woefulwolf.github.io/imping-codegen/) · Early development.
